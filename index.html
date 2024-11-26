@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>QuaggaJS Test</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Updated Content Security Policy -->
+    <meta http-equiv="Content-Security-Policy" content="
+        default-src 'self'; 
+        script-src 'self' https://cdnjs.cloudflare.com blob:; 
+        worker-src 'self' blob:; 
+        style-src 'self' 'unsafe-inline';
+    ">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 20px;
+        }
+        #scanner-container {
+            position: relative;
+            display: inline-block;
+            width: 80%;
+            max-width: 800px;
+            margin: 0 auto;
+            border: 2px solid #ccc;
+            border-radius: 4px;
+        }
+        video {
+            width: 100%;
+            height: auto;
+            background-color: #000;
+        }
+        #result {
+            margin-top: 20px;
+            font-size: 1.2em;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <h1>QuaggaJS Camera Test</h1>
+    
+    <div id="scanner-container">
+        <video id="video" autoplay playsinline></video>
+    </div>
+    
+    <p id="result">Initializing scanner...</p>
+
+    <!-- QuaggaJS via CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js" defer></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const resultElement = document.getElementById('result');
+
+            // Check for Web Worker support
+            if (typeof Worker === 'undefined') {
+                alert('Web Workers are not supported in your browser.');
+                resultElement.textContent = 'Web Workers are not supported in your browser.';
+                return;
+            }
+
+            // Initialize QuaggaJS
+            Quagga.init({
+                inputStream: {
+                    type: "LiveStream",
+                    target: document.querySelector('#video'),
+                    constraints: {
+                        width: { min: 640 },
+                        height: { min: 480 },
+                        facingMode: "environment"
+                    }
+                },
+                decoder: {
+                    readers: ["ean_reader", "upc_reader"]
+                },
+                locate: true,
+                numOfWorkers: navigator.hardwareConcurrency || 4,
+                frequency: 10,
+            }, function(err) {
+                if (err) {
+                    console.error(err);
+                    alert('Error initializing scanner: ' + err);
+                    resultElement.textContent = `Error initializing scanner: ${err}`;
+                    return;
+                }
+                Quagga.start();
+                console.log("QuaggaJS initialized and started.");
+                resultElement.textContent = 'Scanner initialized. Point the camera at a barcode.';
+            });
+
+            // Handle barcode detection
+            Quagga.onDetected((data) => {
+                const code = data.codeResult.code;
+                console.log(`Barcode detected: ${code}`);
+                resultElement.textContent = `Barcode detected: ${code}`;
+                Quagga.stop(); // Stop scanning after detection
+            });
+
+            // Handle errors
+            Quagga.onError((err) => {
+                console.error(err);
+                alert('QuaggaJS encountered an error: ' + err);
+                resultElement.textContent = `Error: ${err}`;
+            });
+
+            // Optional: Visual feedback on processing
+            Quagga.onProcessed((result) => {
+                // You can add custom processing here if needed
+            });
+        });
+    </script>
+</body>
+</html>
