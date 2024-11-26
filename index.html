@@ -72,9 +72,7 @@
 </head>
 <body>
   <div id="video-container">
-    <!-- Video element for the camera feed -->
     <video id="video" autoplay muted playsinline></video>
-    <!-- Overlay for the red rectangle -->
     <div id="overlay">
       <div class="guide"></div>
     </div>
@@ -94,26 +92,28 @@
     let codeReader; // ZXing instance
     let stream; // Camera stream
 
-    // Function to start the scanner
+    // Initialize the scanner
     async function startScanner() {
       try {
-        console.log('Initializing scanner...');
-        // Ensure permissions are explicitly requested
+        console.log('Requesting camera access...');
         stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { exact: 'environment' } }
         });
 
-        // Bind video stream to the video element
+        // Assign stream to video element
         videoElement.srcObject = stream;
+        console.log('Camera access granted and video stream started.');
 
         // Initialize ZXing barcode reader
         codeReader = new ZXingBrowser.BrowserMultiFormatReader();
+        console.log('ZXing Reader initialized:', codeReader);
 
+        // Start decoding the video feed
         await codeReader.decodeFromVideoDevice(null, videoElement, (result, error) => {
           if (result) {
             console.log('Barcode detected:', result.text);
             alert(`Barcode Detected: ${result.text}`);
-            stopScanner(); // Stop scanning after detecting a barcode
+            stopScanner(); // Stop scanning after a successful detection
           }
           if (error) {
             console.warn('Scanning error:', error.message || error);
@@ -124,26 +124,26 @@
         startButton.disabled = true;
         stopButton.disabled = false;
       } catch (err) {
-        console.error('Error starting scanner:', err.message || err);
-        alert('Unable to access the camera. Please check permissions and try again.');
+        console.error('Error initializing scanner:', err.message || err);
+        alert('Error: Unable to initialize the camera or scanner.');
       }
     }
 
-    // Function to stop the scanner
+    // Stop the scanner
     function stopScanner() {
       if (codeReader) {
         codeReader.reset();
-        console.log('Scanner stopped.');
+        console.log('ZXing Reader stopped.');
       }
       if (stream) {
         stream.getTracks().forEach(track => track.stop());
-        console.log('Camera stopped.');
+        console.log('Camera stream stopped.');
       }
       startButton.disabled = false;
       stopButton.disabled = true;
     }
 
-    // Event listeners
+    // Add event listeners
     startButton.addEventListener('click', startScanner);
     stopButton.addEventListener('click', stopScanner);
   </script>
