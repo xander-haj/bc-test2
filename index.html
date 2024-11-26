@@ -12,7 +12,7 @@
             position: relative;
             width: 100%;
             max-width: 480px; /* Adjust as needed */
-            margin: auto;
+            margin: 20px auto;
             padding-top: 75%; /* 4:3 Aspect Ratio (height/width = 0.75) */
             background: #000;
             overflow: hidden;
@@ -32,6 +32,17 @@
             margin: 20px auto;
             padding: 10px 20px;
             font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        /* Styling for debugging messages */
+        #debug-message {
+            text-align: center;
+            margin-top: 10px;
+            font-family: Arial, sans-serif;
+            color: #333;
         }
     </style>
 </head>
@@ -44,21 +55,26 @@
         <canvas id="overlay"></canvas>
     </div>
 
+    <!-- Debug Message -->
+    <div id="debug-message"></div>
+
     <script>
-        // Reference to the Start Scanner button
+        // Reference to the Start Scanner button and debug message div
         const startButton = document.getElementById('start-button');
+        const debugMessage = document.getElementById('debug-message');
 
         // Event listener for the Start Scanner button
         startButton.addEventListener('click', function() {
             // Disable the button to prevent multiple initializations
             startButton.disabled = true;
+            debugMessage.textContent = "Initializing scanner...";
 
             // Initialize QuaggaJS
             Quagga.init({
                 inputStream: {
                     name: "Live",
                     type: "LiveStream",
-                    target: document.querySelector('#scanner-container'), // Use the container div
+                    target: document.querySelector('#scanner-container'), // Container to append video
                     constraints: {
                         facingMode: "environment", // Use rear camera
                         width: { ideal: 640 },
@@ -66,30 +82,50 @@
                     }
                 },
                 decoder: {
-                    readers: ["upc_reader"] // UPC barcode reader
+                    readers: [
+                        "upc_reader",       // UPC-A, UPC-E
+                        "ean_reader",       // EAN-13, EAN-8
+                        "code_128_reader",  // Code 128
+                        "code_39_reader",   // Code 39
+                        "code_93_reader",   // Code 93
+                        "codabar_reader"    // Codabar
+                    ]
                 },
                 locate: true, // Enable localization of barcodes
+                locate: true,
+                multiple: false, // Stop after first barcode is detected
                 area: {
-                    top: "0%",    // Top offset
-                    right: "0%",  // Right offset
-                    left: "0%",   // Left offset
-                    bottom: "0%"  // Bottom offset
+                    top: "30%",    // Top offset
+                    right: "30%",  // Right offset
+                    left: "30%",   // Left offset
+                    bottom: "30%"  // Bottom offset
                 },
                 debug: {
-                    drawBoundingBox: false, // Disable Quagga's bounding box
-                    showFrequency: false,
-                    drawScanline: false,
-                    showPattern: false
+                    showCanvas: true, // Show the canvas overlay
+                    showPatches: false,
+                    showFoundPatches: false,
+                    showSkeleton: true, // Show skeleton for better debugging
+                    showLabels: true,
+                    showPatchLabels: false,
+                    showRemainingPatchLabels: false,
+                    boxFromPatches: {
+                        showTransformed: false,
+                        showTransformedBox: false,
+                        showBB: false
+                    }
                 }
             }, function(err) {
                 if (err) {
                     console.error(err);
-                    alert("Error initializing the scanner.");
+                    alert("Error initializing the scanner: " + err);
                     startButton.disabled = false;
+                    debugMessage.textContent = "Scanner initialization failed.";
                     return;
                 }
                 // Start QuaggaJS
                 Quagga.start();
+                debugMessage.textContent = "Scanning for barcodes...";
+                console.log("QuaggaJS initialized successfully.");
             });
 
             // Event handler when a barcode is detected
@@ -99,6 +135,7 @@
                 alert("Barcode detected: " + code);
                 Quagga.stop(); // Stop the scanner after detection
                 startButton.disabled = false; // Re-enable the button
+                debugMessage.textContent = "Barcode detected: " + code;
             });
 
             // Handle processed frames for debugging and overlay
@@ -110,25 +147,44 @@
                     // Clear previous drawings
                     context.clearRect(0, 0, overlay.width, overlay.height);
 
+                    // Draw detected boxes
                     if (result.boxes) {
-                        result.boxes.filter(function(box) {
-                            return box !== result.box;
-                        }).forEach(function(box) {
-                            context.strokeStyle = "#00FF00";
+                        result.boxes.forEach(function(box) {
+                            context.strokeStyle = "#00FF00"; // Green for all boxes
                             context.lineWidth = 2;
-                            context.strokeRect(box[0].x, box[0].y, box[2].x - box[0].x, box[2].y - box[0].y);
+                            context.beginPath();
+                            box.forEach(function(point, index) {
+                                if (index === 0) {
+                                    context.moveTo(point.x, point.y);
+                                } else {
+                                    context.lineTo(point.x, point.y);
+                                }
+                            });
+                            context.closePath();
+                            context.stroke();
                         });
                     }
 
+                    // Highlight the currently detected box
                     if (result.box) {
-                        context.strokeStyle = "#FF0000";
+                        context.strokeStyle = "#FF0000"; // Red for the current box
                         context.lineWidth = 2;
-                        context.strokeRect(result.box[0].x, result.box[0].y, result.box[2].x - result.box[0].x, result.box[2].y - result.box[0].y);
+                        context.beginPath();
+                        result.box.forEach(function(point, index) {
+                            if (index === 0) {
+                                context.moveTo(point.x, point.y);
+                            } else {
+                                context.lineTo(point.x, point.y);
+                            }
+                        });
+                        context.closePath();
+                        context.stroke();
                     }
 
+                    // If a code is detected, display it
                     if (result.codeResult && result.codeResult.code) {
                         context.font = "18px Arial";
-                        context.fillStyle = "#FF0000";
+                        context.fillStyle = "#FF0000"; // Red text
                         context.fillText(result.codeResult.code, result.box[0].x, result.box[0].y - 10);
                     }
                 }
