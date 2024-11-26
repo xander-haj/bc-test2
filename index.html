@@ -73,7 +73,7 @@
 <body>
   <div id="video-container">
     <!-- Video element for the camera feed -->
-    <video id="video" autoplay></video>
+    <video id="video" autoplay muted playsinline></video>
     <!-- Overlay for the red rectangle -->
     <div id="overlay">
       <div class="guide"></div>
@@ -87,48 +87,57 @@
   <!-- ZXing Library -->
   <script src="https://unpkg.com/@zxing/browser@0.0.9/umd/index.min.js"></script>
   <script>
-    // DOM elements
+    // References to DOM elements
     const startButton = document.getElementById('start-button');
     const stopButton = document.getElementById('stop-button');
     const videoElement = document.getElementById('video');
-    let codeReader;
+    let codeReader; // ZXing instance
+    let stream; // Camera stream
 
-    // Start the scanner
-    function startScanner() {
-      // Log start of function for debugging
-      console.log('Initializing ZXing scanner...');
-      
-      // Create a new instance of the ZXing code reader
-      codeReader = new ZXingBrowser.BrowserMultiFormatReader();
+    // Function to start the scanner
+    async function startScanner() {
+      try {
+        console.log('Initializing scanner...');
+        // Ensure permissions are explicitly requested
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { exact: 'environment' } }
+        });
 
-      // Request access to the camera and start scanning
-      codeReader
-        .decodeFromVideoDevice(null, videoElement, (result, error) => {
+        // Bind video stream to the video element
+        videoElement.srcObject = stream;
+
+        // Initialize ZXing barcode reader
+        codeReader = new ZXingBrowser.BrowserMultiFormatReader();
+
+        await codeReader.decodeFromVideoDevice(null, videoElement, (result, error) => {
           if (result) {
             console.log('Barcode detected:', result.text);
             alert(`Barcode Detected: ${result.text}`);
-            stopScanner(); // Stop scanning once a barcode is detected
+            stopScanner(); // Stop scanning after detecting a barcode
           }
           if (error) {
             console.warn('Scanning error:', error.message || error);
           }
-        })
-        .then(() => {
-          console.log('Scanner initialized successfully.');
-          startButton.disabled = true;
-          stopButton.disabled = false;
-        })
-        .catch(err => {
-          console.error('Failed to initialize scanner:', err.message || err);
-          alert('Error: Unable to access the camera. Please check permissions.');
         });
+
+        console.log('Scanner started successfully.');
+        startButton.disabled = true;
+        stopButton.disabled = false;
+      } catch (err) {
+        console.error('Error starting scanner:', err.message || err);
+        alert('Unable to access the camera. Please check permissions and try again.');
+      }
     }
 
-    // Stop the scanner
+    // Function to stop the scanner
     function stopScanner() {
       if (codeReader) {
         codeReader.reset();
         console.log('Scanner stopped.');
+      }
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        console.log('Camera stopped.');
       }
       startButton.disabled = false;
       stopButton.disabled = true;
