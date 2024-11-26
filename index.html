@@ -3,48 +3,64 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Web Barcode Scanner</title>
+  <title>Barcode Scanner</title>
   <style>
-    body { text-align: center; font-family: Arial, sans-serif; margin: 0; padding: 0; }
-    video { width: 100%; height: auto; }
+    body { text-align: center; font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f4f4f4; }
+    video { width: 100%; height: auto; border: 1px solid #ccc; }
     #overlay { 
-      position: absolute; top: 0; left: 0; right: 0; bottom: 0; 
-      border: 2px dashed red; margin: auto; width: 80%; height: 20%; 
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 80%; height: 30%; border: 2px dashed red; z-index: 2; pointer-events: none;
     }
-    #result { margin: 20px; font-size: 1.5em; color: green; }
+    #result, #history { margin: 20px; font-size: 1.2em; }
+    #history { max-height: 200px; overflow-y: auto; background: #fff; padding: 10px; border: 1px solid #ccc; }
+    #error { color: red; margin-top: 10px; }
   </style>
 </head>
 <body>
   <h1>Barcode Scanner</h1>
-  <video id="video" autoplay></video>
   <div id="overlay"></div>
-  <div id="result">Result will appear here</div>
+  <video id="video" autoplay></video>
+  <div id="result">Scanned Result: <span id="scannedText">None</span></div>
+  <div id="history"><strong>Scan History:</strong></div>
+  <div id="error"></div>
   
   <script type="module">
     import { BrowserMultiFormatReader } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.19.0/esm/index.min.js';
 
     const video = document.getElementById('video');
-    const resultDiv = document.getElementById('result');
+    const resultDiv = document.getElementById('scannedText');
+    const historyDiv = document.getElementById('history');
+    const errorDiv = document.getElementById('error');
     const reader = new BrowserMultiFormatReader();
 
     async function startScanner() {
       try {
-        // Request camera access
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        const constraints = {
+          video: {
+            facingMode: { exact: "environment" } // Use rear camera
+          }
+        };
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = stream;
 
-        // Continuously scan for barcodes
         reader.decodeFromVideoDevice(null, video, (result, err) => {
           if (result) {
-            resultDiv.textContent = `Scanned Code: ${result.text}`;
+            const code = result.text;
+            if (code !== resultDiv.textContent) {
+              resultDiv.textContent = code;
+              const historyItem = document.createElement("div");
+              historyItem.textContent = code;
+              historyDiv.appendChild(historyItem);
+            }
           }
           if (err && !(err instanceof ZXing.NotFoundException)) {
             console.error(err);
+            errorDiv.textContent = `Error: ${err.message}`;
           }
         });
       } catch (err) {
-        console.error('Camera access denied:', err);
-        resultDiv.textContent = 'Unable to access the camera.';
+        console.error(err);
+        errorDiv.textContent = "Camera access is blocked or not available.";
       }
     }
 
