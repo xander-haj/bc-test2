@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>UPC Barcode Scanner</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         /* Container for video and overlay with 4:3 aspect ratio */
         #video-container {
@@ -13,13 +14,14 @@
             margin: 0 auto;
             background-color: #000;
         }
-        /* Start Scanner button styling */
-        #startButton {
-            display: block;
-            margin: 20px auto;
-            padding: 10px 20px;
-            font-size: 16px;
-            cursor: pointer;
+        /* Interactive div where QuaggaJS will render the video */
+        #interactive {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
         }
         /* Overlay canvas styling */
         #overlay {
@@ -29,6 +31,15 @@
             width: 100%;
             height: 100%;
             pointer-events: none;
+            z-index: 2;
+        }
+        /* Start Scanner button styling */
+        #startButton {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -41,10 +52,8 @@
     <!-- Button to start the scanner -->
     <button id="startButton">Start Scanner</button>
 
-    <!-- Include Local Libraries -->
+    <!-- Include Local QuaggaJS Library -->
     <script src="lib/quagga.min.js"></script>
-    <script src="lib/papaparse.min.js"></script>
-    <script src="lib/FileSaver.min.js"></script>
     <script>
         // Get references to DOM elements
         const startButton = document.getElementById('startButton');
@@ -165,7 +174,7 @@
         // Event listener for window resize to adjust overlay
         window.addEventListener('resize', resizeOverlay);
 
-        // Event listener for interactive div loaded to set overlay size
+        // Event listener for window load to set overlay size
         window.addEventListener('load', () => {
             resizeOverlay();
         });
