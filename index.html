@@ -27,7 +27,7 @@
       overflow: hidden;
     }
 
-    #video-container video {
+    #video {
       width: 100%;
       height: 100%;
       object-fit: cover;
@@ -73,91 +73,62 @@
 <body>
   <div id="video-container">
     <video id="video" autoplay></video>
-    <canvas id="overlay">
+    <div id="overlay">
       <div class="guide"></div>
-    </canvas>
+    </div>
   </div>
   <div id="controls">
     <button id="start-button">Start Scanner</button>
     <button id="stop-button" disabled>Stop Scanner</button>
   </div>
 
-  <!-- Ensure this script is loaded first -->
-  <script src="lib/quagga.min.js"></script>
-
+  <!-- ZXing Library -->
+  <script src="https://unpkg.com/@zxing/browser@0.0.9/umd/index.min.js"></script>
   <script>
+    // References to DOM elements
     const startButton = document.getElementById('start-button');
     const stopButton = document.getElementById('stop-button');
-    const video = document.getElementById('video');
+    const videoElement = document.getElementById('video');
+    let codeReader;
 
     // Start the barcode scanner
     function startScanner() {
-      navigator.mediaDevices.enumerateDevices().then(devices => {
-        const videoDevices = devices.filter(device => device.kind === "videoinput");
-        const rearCamera = videoDevices.find(device => device.label.toLowerCase().includes("back")) || videoDevices[0];
+      // Initialize ZXing code reader
+      codeReader = new ZXingBrowser.BrowserMultiFormatReader();
 
-        if (!rearCamera) {
-          throw new Error('No camera found.');
-        }
-
-        return navigator.mediaDevices.getUserMedia({
-          video: {
-            deviceId: { exact: rearCamera.deviceId }
+      // Request camera permissions and start video feed
+      codeReader
+        .decodeFromVideoDevice(null, videoElement, (result, error) => {
+          if (result) {
+            alert(`Barcode Detected: ${result.text}`);
+            stopScanner(); // Stop scanning after detecting a barcode
           }
-        });
-      }).then(stream => {
-        video.srcObject = stream;
-
-        // Configure QuaggaJS
-        Quagga.init({
-          inputStream: {
-            name: 'Live',
-            type: 'LiveStream',
-            target: video, // DOM element for video feed
-            constraints: {
-              width: 640,
-              height: 480,
-              facingMode: 'environment' // Default to rear camera
-            }
-          },
-          decoder: {
-            readers: ['upc_reader']
-          },
-          locate: true, // Enables debugging visuals
-        }, (err) => {
-          if (err) {
-            console.error(err);
-            alert('Failed to initialize scanner.');
-            return;
+          if (error) {
+            console.error('Scanning Error:', error.message || error);
           }
-          Quagga.start();
+        })
+        .then(() => {
+          console.log('Scanner started successfully.');
           startButton.disabled = true;
           stopButton.disabled = false;
-
-          // Add detection event
-          Quagga.onDetected(result => {
-            const code = result.codeResult.code;
-            alert(`Barcode Detected: ${code}`);
-            stopScanner(); // Stop after detection
-          });
+        })
+        .catch(err => {
+          console.error('Error initializing scanner:', err.message || err);
+          alert('Error: Unable to access the camera.');
         });
-      }).catch(err => {
-        console.error(err);
-        alert(`Camera access denied or unavailable: ${err.message}`);
-      });
     }
 
     // Stop the barcode scanner
     function stopScanner() {
-      Quagga.stop();
-      if (video.srcObject) {
-        video.srcObject.getTracks().forEach(track => track.stop());
+      if (codeReader) {
+        codeReader.reset();
+        console.log('Scanner stopped.');
       }
       startButton.disabled = false;
       stopButton.disabled = true;
     }
 
-    // Event listeners
+    // Event listeners for buttons
     startButton.addEventListener('click', startScanner);
     stopButton.addEventListener('click', stopScanner);
   </script>
