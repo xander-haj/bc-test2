@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Android Barcode Scanner with ZXing-js</title>
+    <title>ZXing-js Barcode Scanner</title>
     <!-- ZXing-js Library -->
     <script src="https://unpkg.com/@zxing/library@0.19.0/umd/index.min.js"></script>
     <style>
-        /* Center the content and set a maximum width */
+        /* Center the content and set a clean background */
         body {
             display: flex;
             flex-direction: column;
@@ -31,6 +31,7 @@
             margin-bottom: 20px;
         }
 
+        /* Disabled button styling */
         #start-button:disabled {
             background-color: #888;
             cursor: not-allowed;
@@ -74,49 +75,94 @@
     <div id="debug-message">Press "Start Scanner" to begin.</div>
 
     <script>
+        console.log("Page loaded.");
+
+        // Check if ZXing is loaded
+        if (!window.ZXing) {
+            console.error("ZXing library not loaded.");
+            document.getElementById('debug-message').textContent = "ZXing library not loaded.";
+        } else {
+            console.log("ZXing library loaded:", ZXing);
+        }
+
         // References to DOM elements
         const startButton = document.getElementById('start-button');
         const video = document.getElementById('video');
         const debugMessage = document.getElementById('debug-message');
 
         // Initialize ZXing Barcode Reader
-        const codeReader = new ZXing.BrowserMultiFormatReader();
+        let codeReader;
 
         // Function to start the scanner
         const startScanner = () => {
+            console.log("Start Scanner button clicked.");
             startButton.disabled = true;
             debugMessage.textContent = "Requesting camera access...";
 
-            // Start decoding from the video stream
-            codeReader.decodeFromVideoDevice(null, video, (result, err) => {
-                if (result) {
-                    // Barcode detected
-                    console.log("Barcode detected:", result);
-                    alert(`Barcode detected: ${result.getText()}`);
+            try {
+                // Initialize the Barcode Reader
+                codeReader = new ZXing.BrowserMultiFormatReader();
+                console.log("BrowserMultiFormatReader initialized.");
+
+                // Start decoding from the video stream
+                codeReader.decodeFromVideoDevice(null, video, (result, err) => {
+                    if (result) {
+                        console.log("Barcode detected:", result);
+                        alert(`Barcode detected: ${result.getText()}`);
+                        stopScanner();
+                    }
+                    if (err) {
+                        if (err instanceof ZXing.NotFoundException) {
+                            // No barcode found in this frame
+                            // This is a normal part of scanning
+                            console.log("No barcode found in this frame.");
+                        } else {
+                            console.error("Error during scanning:", err);
+                            debugMessage.textContent = `Error: ${err.message}`;
+                            stopScanner();
+                        }
+                    }
+                })
+                .then(() => {
+                    debugMessage.textContent = "Scanning for barcodes...";
+                    console.log("ZXing-js started scanning.");
+                })
+                .catch((error) => {
+                    console.error("Initialization error:", error);
+                    alert(`Error initializing the scanner: ${error}`);
+                    debugMessage.textContent = "Failed to initialize scanner.";
+                    startButton.disabled = false;
+                });
+
+                // Add event listeners to video element for debugging
+                video.addEventListener('loadedmetadata', () => {
+                    console.log("Video metadata loaded.");
+                });
+
+                video.addEventListener('playing', () => {
+                    console.log("Video is playing.");
+                });
+
+                video.addEventListener('error', (e) => {
+                    console.error("Video error:", e);
+                    debugMessage.textContent = "Error accessing the camera.";
                     stopScanner();
-                }
-                if (err && !(err instanceof ZXing.NotFoundException)) {
-                    // Handle errors (excluding NotFoundException which is normal)
-                    console.error("Error:", err);
-                    debugMessage.textContent = `Error: ${err.message}`;
-                    stopScanner();
-                }
-            })
-            .then(() => {
-                debugMessage.textContent = "Scanning for barcodes...";
-                console.log("ZXing-js initialized successfully.");
-            })
-            .catch((error) => {
-                console.error("Initialization error:", error);
-                alert(`Error initializing the scanner: ${error}`);
-                debugMessage.textContent = "Failed to initialize scanner.";
+                });
+            } catch (error) {
+                console.error("Exception during scanner initialization:", error);
+                alert(`Exception initializing scanner: ${error}`);
+                debugMessage.textContent = "Exception during scanner initialization.";
                 startButton.disabled = false;
-            });
+            }
         };
 
         // Function to stop the scanner
         const stopScanner = () => {
-            codeReader.reset();
+            console.log("Stopping scanner.");
+            if (codeReader) {
+                codeReader.reset();
+                console.log("Scanner reset.");
+            }
             debugMessage.textContent = "Scanner stopped.";
             startButton.disabled = false;
         };
