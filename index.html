@@ -4,14 +4,30 @@
     <meta charset="UTF-8">
     <title>UPC Barcode Scanner</title>
     <style>
-        /* Container for the video stream with 4:3 aspect ratio */
-        #interactive {
+        /* Container for video and overlay */
+        #video-container {
             position: relative;
             width: 100%;
             max-width: 600px;
             aspect-ratio: 4 / 3;
             margin: 0 auto;
             background-color: #000;
+        }
+        /* Video element styling */
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        /* Overlay canvas styling */
+        canvas#overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
         }
         /* Start Scanner button styling */
         #startButton {
@@ -21,28 +37,21 @@
             font-size: 16px;
             cursor: pointer;
         }
-        /* Overlay canvas styling */
-        #overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-        }
     </style>
 </head>
 <body>
-    <!-- Container where QuaggaJS will render the video -->
-    <div id="interactive">
+    <!-- Container for video and overlay -->
+    <div id="video-container">
         <video id="video" autoplay playsinline></video>
         <canvas id="overlay"></canvas>
     </div>
     <!-- Button to start the scanner -->
     <button id="startButton">Start Scanner</button>
 
-    <!-- Include QuaggaJS via CDN -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+    <!-- Include Local Libraries -->
+    <script src="lib/quagga.min.js"></script>
+    <script src="lib/papaparse.min.js"></script>
+    <script src="lib/FileSaver.min.js"></script>
     <script>
         // Get references to DOM elements
         const startButton = document.getElementById('startButton');
@@ -50,7 +59,7 @@
         const overlay = document.getElementById('overlay');
         const overlayCtx = overlay.getContext('2d');
 
-        // Function to start the scanner
+        // Function to start the barcode scanner
         function startScanner() {
             Quagga.init({
                 inputStream: {
@@ -58,14 +67,14 @@
                     constraints: {
                         facingMode: "environment" // Use rear camera
                     },
-                    target: video // Target the video element directly
+                    target: video // Target the video element
                 },
                 decoder: {
                     readers: ["upc_reader", "upc_e_reader"] // Specify barcode types
                 },
-                locate: true, // Try to locate the barcode in the image
+                locate: true, // Enable localization of barcodes
                 debug: {
-                    showCanvas: false, // Disable default canvas debugging
+                    showCanvas: false,
                     showPatches: false,
                     showFoundPatches: false,
                     showSkeleton: false,
@@ -82,25 +91,25 @@
                 }
                 Quagga.start();
                 console.log('QuaggaJS started.');
-                startButton.style.display = 'none'; // Hide the start button after starting
+                startButton.style.display = 'none'; // Hide start button after starting
             });
 
-            // Event Listener for Detected Barcodes
+            // Event listener for detected barcodes
             Quagga.onDetected((data) => {
                 const code = data.codeResult.code;
                 console.log('Barcode detected:', code);
                 alert('Barcode detected: ' + code);
                 Quagga.stop(); // Stop scanning after detection
-                startButton.style.display = 'block'; // Show the start button again
+                startButton.style.display = 'block'; // Show start button again
             });
 
-            // Event Listener for Processed Frames (for debugging)
+            // Event listener for processed frames (for overlay)
             Quagga.onProcessed((result) => {
                 // Clear the overlay canvas
                 overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
 
                 if (result) {
-                    // Draw detected boxes
+                    // Draw all detected boxes
                     if (result.boxes) {
                         result.boxes.filter(box => box !== result.box).forEach(box => {
                             drawPath(box, 'rgba(0, 255, 0, 0.3)');
@@ -112,7 +121,7 @@
                         drawPath(result.box, '#00FF00');
                     }
 
-                    // Draw the line where the barcode is detected
+                    // Draw the line where the barcode was detected
                     if (result.codeResult && result.codeResult.code) {
                         drawPath(result.line, '#FF0000');
                     }
@@ -153,22 +162,23 @@
             overlayCtx.stroke();
         }
 
-        // Start Scanner on Button Click
+        // Adjust overlay canvas size to match video size
+        function resizeOverlay() {
+            overlay.width = video.clientWidth;
+            overlay.height = video.clientHeight;
+            drawGuideRectangle();
+        }
+
+        // Event listener for window resize to adjust overlay
+        window.addEventListener('resize', resizeOverlay);
+
+        // Event listener for video metadata loaded to set overlay size
+        video.addEventListener('loadedmetadata', resizeOverlay);
+
+        // Start the scanner when the start button is clicked
         startButton.addEventListener('click', () => {
             startScanner();
             console.log('Start Scanner button clicked.');
-        });
-
-        // Resize the overlay canvas to match video size
-        window.addEventListener('resize', () => {
-            overlay.width = video.clientWidth;
-            overlay.height = video.clientHeight;
-        });
-
-        // Initialize overlay size when video metadata is loaded
-        video.addEventListener('loadedmetadata', () => {
-            overlay.width = video.clientWidth;
-            overlay.height = video.clientHeight;
         });
     </script>
 </body>
