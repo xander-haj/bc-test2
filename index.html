@@ -87,24 +87,23 @@
     const startButton = document.getElementById('start-button');
     const stopButton = document.getElementById('stop-button');
     const video = document.getElementById('video');
-    const overlay = document.getElementById('overlay');
-    const guide = document.createElement('div');
-    guide.className = 'guide';
-    overlay.appendChild(guide);
 
     // Start the barcode scanner
     function startScanner() {
       navigator.mediaDevices.enumerateDevices().then(devices => {
-  const videoDevices = devices.filter(device => device.kind === "videoinput");
-  const rearCamera = videoDevices.find(device => device.label.toLowerCase().includes("back")) || videoDevices[0];
+        const videoDevices = devices.filter(device => device.kind === "videoinput");
+        const rearCamera = videoDevices.find(device => device.label.toLowerCase().includes("back")) || videoDevices[0];
 
-  return navigator.mediaDevices.getUserMedia({
-    video: {
-      deviceId: rearCamera.deviceId
-    }
-  });
-});
-.then(stream => {
+        if (!rearCamera) {
+          throw new Error('No camera found.');
+        }
+
+        return navigator.mediaDevices.getUserMedia({
+          video: {
+            deviceId: { exact: rearCamera.deviceId }
+          }
+        });
+      }).then(stream => {
         video.srcObject = stream;
 
         // Configure QuaggaJS
@@ -112,11 +111,11 @@
           inputStream: {
             name: 'Live',
             type: 'LiveStream',
-            target: video,
+            target: video, // DOM element for video feed
             constraints: {
               width: 640,
               height: 480,
-              facingMode: 'environment'
+              facingMode: 'environment' // Default to rear camera
             }
           },
           decoder: {
@@ -142,14 +141,16 @@
         });
       }).catch(err => {
         console.error(err);
-        alert('Camera access denied or unavailable.');
+        alert(`Camera access denied or unavailable: ${err.message}`);
       });
     }
 
     // Stop the barcode scanner
     function stopScanner() {
       Quagga.stop();
-      video.srcObject.getTracks().forEach(track => track.stop());
+      if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+      }
       startButton.disabled = false;
       stopButton.disabled = true;
     }
