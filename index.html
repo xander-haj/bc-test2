@@ -7,39 +7,20 @@
     <!-- ZXing-js Library -->
     <script src="https://unpkg.com/@zxing/library@0.19.0/umd/index.min.js"></script>
     <style>
-        /* Container styling to maintain 4:3 aspect ratio and center content */
-        #scanner-container {
-            position: relative;
-            width: 100%;
-            max-width: 600px; /* Adjust as needed */
-            margin: 20px auto;
-            padding-top: 75%; /* 4:3 Aspect Ratio (height/width = 0.75) */
-            background: #000;
-            overflow: hidden;
+        /* Center the content and set a maximum width */
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+            font-family: Arial, sans-serif;
         }
-        /* Video element styling */
-        #video {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover; /* Ensure the video covers the container */
-        }
-        /* Overlay canvas styling */
-        #overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none; /* Allow clicks to pass through */
-            z-index: 10; /* Ensure overlay is above video */
-        }
+
         /* Start Scanner button styling */
         #start-button {
-            display: block;
-            margin: 20px auto;
             padding: 15px 30px;
             font-size: 18px;
             background-color: #4CAF50;
@@ -47,16 +28,35 @@
             border: none;
             border-radius: 8px;
             cursor: pointer;
+            margin-bottom: 20px;
         }
+
         #start-button:disabled {
             background-color: #888;
             cursor: not-allowed;
         }
+
+        /* Video container styling */
+        #video-container {
+            position: relative;
+            width: 100%;
+            max-width: 600px;
+            aspect-ratio: 4 / 3;
+            background-color: #000;
+            overflow: hidden;
+            border-radius: 10px;
+        }
+
+        /* Video element styling */
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
         /* Debug message styling */
         #debug-message {
-            text-align: center;
             margin-top: 10px;
-            font-family: Arial, sans-serif;
             color: #333;
         }
     </style>
@@ -65,10 +65,9 @@
     <!-- Start Scanner Button -->
     <button id="start-button">Start Scanner</button>
 
-    <!-- Scanner Container with Video and Overlay Canvas -->
-    <div id="scanner-container">
+    <!-- Video Container -->
+    <div id="video-container">
         <video id="video" autoplay muted playsinline></video>
-        <canvas id="overlay"></canvas>
     </div>
 
     <!-- Debug Message -->
@@ -78,119 +77,52 @@
         // References to DOM elements
         const startButton = document.getElementById('start-button');
         const video = document.getElementById('video');
-        const overlay = document.getElementById('overlay');
         const debugMessage = document.getElementById('debug-message');
-        const overlayContext = overlay.getContext('2d');
 
         // Initialize ZXing Barcode Reader
         const codeReader = new ZXing.BrowserMultiFormatReader();
 
-        // Function to resize the overlay canvas to match video dimensions
-        function resizeOverlay() {
-            overlay.width = video.videoWidth;
-            overlay.height = video.videoHeight;
-            drawOverlay(); // Redraw overlay after resizing
-        }
-
-        // Function to draw scan lines (for visual feedback)
-        function drawOverlay() {
-            const width = overlay.width;
-            const height = overlay.height;
-            const lineSpacing = 20; // Adjust spacing between lines
-            overlayContext.strokeStyle = 'rgba(255, 0, 0, 0.5)';
-            overlayContext.lineWidth = 2;
-
-            for (let y = 0; y < height; y += lineSpacing) {
-                overlayContext.beginPath();
-                overlayContext.moveTo(0, y);
-                overlayContext.lineTo(width, y);
-                overlayContext.stroke();
-            }
-
-            // Draw a red rectangle in the center as a guide
-            const rectWidth = width * 0.6;
-            const rectHeight = height * 0.4;
-            const rectX = (width - rectWidth) / 2;
-            const rectY = (height - rectHeight) / 2;
-
-            overlayContext.strokeStyle = 'rgba(255, 0, 0, 0.8)';
-            overlayContext.lineWidth = 3;
-            overlayContext.strokeRect(rectX, rectY, rectWidth, rectHeight);
-        }
-
-        // Function to initialize the scanner
-        function initializeScanner() {
-            debugMessage.textContent = "Initializing scanner...";
+        // Function to start the scanner
+        const startScanner = () => {
             startButton.disabled = true;
+            debugMessage.textContent = "Requesting camera access...";
 
             // Start decoding from the video stream
             codeReader.decodeFromVideoDevice(null, video, (result, err) => {
                 if (result) {
                     // Barcode detected
-                    console.log("Barcode detected: " + result.getText());
-                    alert("Barcode detected: " + result.getText());
+                    console.log("Barcode detected:", result);
+                    alert(`Barcode detected: ${result.getText()}`);
                     stopScanner();
                 }
                 if (err && !(err instanceof ZXing.NotFoundException)) {
-                    console.error(err);
-                    debugMessage.textContent = "Error: " + err;
+                    // Handle errors (excluding NotFoundException which is normal)
+                    console.error("Error:", err);
+                    debugMessage.textContent = `Error: ${err.message}`;
+                    stopScanner();
                 }
             })
             .then(() => {
                 debugMessage.textContent = "Scanning for barcodes...";
                 console.log("ZXing-js initialized successfully.");
             })
-            .catch((err) => {
-                console.error("ZXing initialization error:", err);
-                alert("Error initializing the scanner: " + err);
+            .catch((error) => {
+                console.error("Initialization error:", error);
+                alert(`Error initializing the scanner: ${error}`);
+                debugMessage.textContent = "Failed to initialize scanner.";
                 startButton.disabled = false;
-                debugMessage.textContent = "Scanner initialization failed.";
             });
-
-            // Adjust overlay size when video metadata is loaded
-            video.addEventListener('loadedmetadata', resizeOverlay);
-
-            // Redraw overlay when the video is resized
-            window.addEventListener('resize', () => {
-                if (!video.paused && !video.ended) {
-                    resizeOverlay();
-                }
-            });
-
-            // Draw initial overlay
-            video.addEventListener('play', () => {
-                drawOverlay();
-                // Continuously update the overlay
-                requestAnimationFrame(function loop() {
-                    if (!video.paused && !video.ended) {
-                        drawOverlay();
-                        requestAnimationFrame(loop);
-                    }
-                });
-            });
-        }
+        };
 
         // Function to stop the scanner
-        function stopScanner() {
+        const stopScanner = () => {
             codeReader.reset();
             debugMessage.textContent = "Scanner stopped.";
             startButton.disabled = false;
-        }
+        };
 
         // Event listener for the Start Scanner button
-        startButton.addEventListener('click', () => {
-            // Check for camera permissions
-            navigator.permissions.query({ name: 'camera' }).then(function(permissionStatus) {
-                if (permissionStatus.state === 'granted' || permissionStatus.state === 'prompt') {
-                    initializeScanner();
-                } else {
-                    alert("Camera access is denied. Please enable it in your browser settings.");
-                }
-            }).catch((err) => {
-                console.error("Permission query error:", err);
-                initializeScanner(); // Proceed to initialize scanner if permission query fails
-            });
-        });
+        startButton.addEventListener('click', startScanner);
     </script>
 </body>
 </html>
