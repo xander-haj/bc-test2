@@ -3,14 +3,20 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Barcode Scanner</title>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Production-Ready Barcode Scanner</title>
   <style>
     body {
-      text-align: center;
       font-family: Arial, sans-serif;
+      text-align: center;
       margin: 0;
       padding: 0;
-      background: #f4f4f4;
+      background: #f9f9f9;
+      color: #333;
+    }
+    h1 {
+      margin: 20px 0;
+      color: #444;
     }
     video {
       width: 90%;
@@ -25,6 +31,14 @@
       font-size: 1.2em;
       margin-top: 20px;
       cursor: pointer;
+      background: #007BFF;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      transition: background 0.3s ease;
+    }
+    #startButton:hover {
+      background: #0056b3;
     }
     #result {
       font-size: 1.2em;
@@ -40,6 +54,7 @@
       width: 90%;
       max-width: 400px;
       font-size: 0.9em;
+      text-align: left;
     }
     #error {
       color: red;
@@ -66,29 +81,30 @@
     const reader = new BrowserMultiFormatReader();
 
     async function startScanner() {
-      // Reset UI
+      // Reset UI elements
       resultText.textContent = 'None';
       errorDiv.textContent = '';
       historyDiv.innerHTML = '<strong>Scan History:</strong>';
+      video.style.display = 'none';
 
       try {
-        // Request access to the rear camera
+        // Request camera access
         const stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: { ideal: 'environment' } }
         });
 
-        // Attach the video stream to the video element
+        // Attach the video stream
         video.srcObject = stream;
         video.style.display = 'block';
 
-        // Start scanning for barcodes
+        // Start decoding barcodes
         reader.decodeFromVideoDevice(null, video, (result, err) => {
           if (result) {
             const code = result.text;
             if (code !== resultText.textContent) {
               resultText.textContent = code;
 
-              // Add the result to history
+              // Append to scan history
               const historyItem = document.createElement('div');
               historyItem.textContent = code;
               historyDiv.appendChild(historyItem);
@@ -101,11 +117,11 @@
         });
       } catch (err) {
         console.error(err);
-        errorDiv.textContent = 'Error accessing camera: ' + err.message;
+        errorDiv.textContent = 'Camera access is required to use the scanner.';
       }
     }
 
-    // Attach event listener to the start button
+    // Event listener for starting the scanner
     startButton.addEventListener('click', startScanner);
   </script>
 </body>
