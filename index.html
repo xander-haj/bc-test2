@@ -2,8 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>QuaggaJS Minimal Test</title>
+    <title>Minimal QuaggaJS Test</title>
     <style>
+        /* Basic Styles for Video and Overlay */
         #video-container {
             position: relative;
             width: 100%;
@@ -37,38 +38,40 @@
     <!-- Include QuaggaJS -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
     <script>
+        // Elements
         const startButton = document.getElementById('startButton');
         const video = document.getElementById('video');
         const overlay = document.getElementById('overlay');
         const overlayCtx = overlay.getContext('2d');
 
-        startButton.addEventListener('click', () => {
+        // Start Scanner Function
+        function startScanner() {
             Quagga.init({
                 inputStream: {
                     type: "LiveStream",
                     constraints: {
                         width: { ideal: 640 },
                         height: { ideal: 480 },
-                        facingMode: "environment"
+                        facingMode: "environment" // Use rear camera
                     },
-                    target: video
+                    target: video // Target the video element directly
                 },
                 decoder: {
-                    readers: ["upc_reader", "upc_e_reader"]
+                    readers: ["upc_reader", "upc_e_reader"] // Specify barcode types
                 },
                 locate: true,
                 debug: {
-                    showCanvas: true,
-                    showPatches: true,
-                    showFoundPatches: true,
-                    showSkeleton: true,
-                    showLabels: true,
-                    showPatchLabels: true,
-                    showRemainingPatchLabels: true,
+                    showCanvas: true, // Enable for debugging
+                    showPatches: true, // Enable for debugging
+                    showFoundPatches: true, // Enable for debugging
+                    showSkeleton: true, // Enable for debugging
+                    showLabels: true, // Enable for debugging
+                    showPatchLabels: true, // Enable for debugging
+                    showRemainingPatchLabels: true, // Enable for debugging
                     boxFromPatches: {
-                        showTransformed: true,
-                        showTransformedBox: true,
-                        showBB: true
+                        showTransformed: true, // Enable for debugging
+                        showTransformedBox: true, // Enable for debugging
+                        showBB: true // Enable for debugging
                     }
                 }
             }, function(err) {
@@ -81,12 +84,14 @@
                 console.log('QuaggaJS started.');
             });
 
+            // Event Listener for Detected Barcodes
             Quagga.onDetected((data) => {
                 console.log('Barcode detected:', data.codeResult.code);
                 alert('Barcode detected: ' + data.codeResult.code);
                 Quagga.stop();
             });
 
+            // Event Listener for Processed Frames
             Quagga.onProcessed((result) => {
                 overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
                 if (result) {
@@ -105,8 +110,9 @@
                     }
                 }
             });
-        });
+        }
 
+        // Function to Draw Paths on Canvas
         function drawPath(path, color) {
             if (!path || path.length === 0) return;
             overlayCtx.beginPath();
@@ -118,6 +124,13 @@
             overlayCtx.strokeStyle = color;
             overlayCtx.stroke();
         }
+
+        // Start Scanner on Button Click
+        startButton.addEventListener('click', () => {
+            startScanner();
+            startButton.style.display = 'none';
+            console.log('Start Scanner button clicked.');
+        });
     </script>
 </body>
 </html>
