@@ -7,17 +7,26 @@
     <!-- QuaggaJS Library -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
     <style>
-        /* Container styling to maintain 4:3 aspect ratio */
+        /* Container styling to maintain 4:3 aspect ratio and center content */
         #scanner-container {
             position: relative;
             width: 100%;
-            max-width: 480px; /* Adjust as needed */
+            max-width: 600px; /* Adjust as needed */
             margin: 20px auto;
             padding-top: 75%; /* 4:3 Aspect Ratio (height/width = 0.75) */
             background: #000;
             overflow: hidden;
         }
-        /* Overlay canvas positioning */
+        /* Video element styling */
+        #video {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover; /* Ensure the video covers the container */
+        }
+        /* Overlay canvas styling */
         #overlay {
             position: absolute;
             top: 0;
@@ -25,19 +34,25 @@
             width: 100%;
             height: 100%;
             pointer-events: none; /* Allow clicks to pass through */
+            z-index: 10; /* Ensure overlay is above video */
         }
         /* Start Scanner button styling */
         #start-button {
             display: block;
             margin: 20px auto;
-            padding: 10px 20px;
-            font-size: 16px;
+            padding: 15px 30px;
+            font-size: 18px;
             background-color: #4CAF50;
             color: white;
             border: none;
-            border-radius: 5px;
+            border-radius: 8px;
+            cursor: pointer;
         }
-        /* Styling for debugging messages */
+        #start-button:disabled {
+            background-color: #888;
+            cursor: not-allowed;
+        }
+        /* Debug message styling */
         #debug-message {
             text-align: center;
             margin-top: 10px;
@@ -50,35 +65,56 @@
     <!-- Start Scanner Button -->
     <button id="start-button">Start Scanner</button>
 
-    <!-- Scanner Container with Overlay -->
+    <!-- Scanner Container with Video and Overlay Canvas -->
     <div id="scanner-container">
+        <video id="video" autoplay muted playsinline></video>
         <canvas id="overlay"></canvas>
     </div>
 
     <!-- Debug Message -->
-    <div id="debug-message"></div>
+    <div id="debug-message">Press "Start Scanner" to begin.</div>
 
     <script>
-        // Reference to the Start Scanner button and debug message div
+        // References to DOM elements
         const startButton = document.getElementById('start-button');
+        const video = document.getElementById('video');
+        const overlay = document.getElementById('overlay');
         const debugMessage = document.getElementById('debug-message');
+        const overlayContext = overlay.getContext('2d');
 
-        // Event listener for the Start Scanner button
-        startButton.addEventListener('click', function() {
-            // Disable the button to prevent multiple initializations
-            startButton.disabled = true;
-            debugMessage.textContent = "Initializing scanner...";
+        // Function to resize the overlay canvas to match video dimensions
+        function resizeOverlay() {
+            overlay.width = video.videoWidth;
+            overlay.height = video.videoHeight;
+        }
 
-            // Initialize QuaggaJS
+        // Function to draw scan lines (for visual feedback)
+        function drawScanLines() {
+            const width = overlay.width;
+            const height = overlay.height;
+            const lineSpacing = 20; // Adjust spacing between lines
+            overlayContext.strokeStyle = 'rgba(255, 0, 0, 0.5)';
+            overlayContext.lineWidth = 2;
+
+            for (let y = 0; y < height; y += lineSpacing) {
+                overlayContext.beginPath();
+                overlayContext.moveTo(0, y);
+                overlayContext.lineTo(width, y);
+                overlayContext.stroke();
+            }
+        }
+
+        // Function to initialize QuaggaJS
+        function initializeQuagga() {
             Quagga.init({
                 inputStream: {
                     name: "Live",
                     type: "LiveStream",
-                    target: document.querySelector('#scanner-container'), // Container to append video
+                    target: video, // Video element
                     constraints: {
-                        facingMode: "environment", // Use rear camera
-                        width: { ideal: 640 },
-                        height: { ideal: 480 }
+                        facingMode: { exact: "environment" }, // Use rear camera
+                        width: { ideal: 1280 }, // Higher resolution
+                        height: { ideal: 720 }
                     }
                 },
                 decoder: {
@@ -92,37 +128,29 @@
                     ]
                 },
                 locate: true, // Enable localization of barcodes
-                locate: true,
                 multiple: false, // Stop after first barcode is detected
-                area: {
-                    top: "30%",    // Top offset
-                    right: "30%",  // Right offset
-                    left: "30%",   // Left offset
-                    bottom: "30%"  // Bottom offset
-                },
                 debug: {
                     showCanvas: true, // Show the canvas overlay
-                    showPatches: false,
-                    showFoundPatches: false,
-                    showSkeleton: true, // Show skeleton for better debugging
+                    showPatches: true,
+                    showFoundPatches: true,
+                    showSkeleton: true,
                     showLabels: true,
                     showPatchLabels: false,
                     showRemainingPatchLabels: false,
                     boxFromPatches: {
-                        showTransformed: false,
-                        showTransformedBox: false,
-                        showBB: false
+                        showTransformed: true,
+                        showTransformedBox: true,
+                        showBB: true
                     }
                 }
             }, function(err) {
                 if (err) {
-                    console.error(err);
+                    console.error("Quagga initialization error:", err);
                     alert("Error initializing the scanner: " + err);
                     startButton.disabled = false;
                     debugMessage.textContent = "Scanner initialization failed.";
                     return;
                 }
-                // Start QuaggaJS
                 Quagga.start();
                 debugMessage.textContent = "Scanning for barcodes...";
                 console.log("QuaggaJS initialized successfully.");
@@ -138,71 +166,93 @@
                 debugMessage.textContent = "Barcode detected: " + code;
             });
 
-            // Handle processed frames for debugging and overlay
+            // Event handler for processed frames (for debugging)
             Quagga.onProcessed(function(result) {
-                const overlay = document.getElementById('overlay');
-                const context = overlay.getContext('2d');
-
                 if (result) {
-                    // Clear previous drawings
-                    context.clearRect(0, 0, overlay.width, overlay.height);
+                    // Clear the overlay canvas
+                    overlayContext.clearRect(0, 0, overlay.width, overlay.height);
 
-                    // Draw detected boxes
+                    // Draw scan lines for visual feedback
+                    drawScanLines();
+
+                    // Draw bounding boxes around detected barcodes
                     if (result.boxes) {
                         result.boxes.forEach(function(box) {
-                            context.strokeStyle = "#00FF00"; // Green for all boxes
-                            context.lineWidth = 2;
-                            context.beginPath();
+                            overlayContext.strokeStyle = "rgba(0, 255, 0, 0.5)";
+                            overlayContext.lineWidth = 2;
+                            overlayContext.beginPath();
                             box.forEach(function(point, index) {
                                 if (index === 0) {
-                                    context.moveTo(point.x, point.y);
+                                    overlayContext.moveTo(point.x, point.y);
                                 } else {
-                                    context.lineTo(point.x, point.y);
+                                    overlayContext.lineTo(point.x, point.y);
                                 }
                             });
-                            context.closePath();
-                            context.stroke();
+                            overlayContext.closePath();
+                            overlayContext.stroke();
                         });
                     }
 
-                    // Highlight the currently detected box
+                    // Highlight the currently detected barcode
                     if (result.box) {
-                        context.strokeStyle = "#FF0000"; // Red for the current box
-                        context.lineWidth = 2;
-                        context.beginPath();
+                        overlayContext.strokeStyle = "rgba(255, 0, 0, 0.8)";
+                        overlayContext.lineWidth = 3;
+                        overlayContext.beginPath();
                         result.box.forEach(function(point, index) {
                             if (index === 0) {
-                                context.moveTo(point.x, point.y);
+                                overlayContext.moveTo(point.x, point.y);
                             } else {
-                                context.lineTo(point.x, point.y);
+                                overlayContext.lineTo(point.x, point.y);
                             }
                         });
-                        context.closePath();
-                        context.stroke();
+                        overlayContext.closePath();
+                        overlayContext.stroke();
                     }
 
-                    // If a code is detected, display it
+                    // Display the decoded barcode value
                     if (result.codeResult && result.codeResult.code) {
-                        context.font = "18px Arial";
-                        context.fillStyle = "#FF0000"; // Red text
-                        context.fillText(result.codeResult.code, result.box[0].x, result.box[0].y - 10);
+                        overlayContext.font = "18px Arial";
+                        overlayContext.fillStyle = "rgba(255, 0, 0, 0.8)";
+                        overlayContext.fillText(result.codeResult.code, result.box[0].x, result.box[0].y - 10);
                     }
                 }
             });
 
-            // Resize the overlay canvas to match the video stream
-            function resizeOverlay() {
-                const overlay = document.getElementById('overlay');
-                const scannerContainer = document.getElementById('scanner-container');
-                overlay.width = scannerContainer.clientWidth;
-                overlay.height = scannerContainer.clientHeight;
-            }
+            // Handle video play event to resize the overlay
+            video.addEventListener('play', function() {
+                resizeOverlay();
+            });
 
-            // Initial resize
-            resizeOverlay();
+            // Handle window resize to adjust overlay size
+            window.addEventListener('resize', function() {
+                if (!video.paused && !video.ended) {
+                    resizeOverlay();
+                }
+            });
+        }
 
-            // Resize on window resize
-            window.addEventListener('resize', resizeOverlay);
+        // Event listener for the Start Scanner button
+        startButton.addEventListener('click', function() {
+            // Disable the button to prevent multiple initializations
+            startButton.disabled = true;
+            debugMessage.textContent = "Requesting camera access...";
+
+            // Request camera access and start video stream
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+                .then(function(stream) {
+                    video.srcObject = stream;
+                    video.setAttribute("playsinline", true); // Required for iOS Safari
+                    video.play();
+                    console.log("Camera stream started.");
+                    debugMessage.textContent = "Initializing scanner...";
+                    initializeQuagga();
+                })
+                .catch(function(err) {
+                    console.error("Camera access error:", err);
+                    alert("Unable to access the camera: " + err);
+                    startButton.disabled = false;
+                    debugMessage.textContent = "Camera access denied.";
+                });
         });
     </script>
 </body>
