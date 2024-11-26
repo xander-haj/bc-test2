@@ -1,224 +1,54 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ZXing-js Barcode Scanner</title>
-    <style>
-        /* Basic Reset and Styling */
-        body {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-            background-color: #f0f0f0;
-            font-family: Arial, sans-serif;
-        }
-
-        /* Start Scanner Button */
-        #start-button {
-            padding: 15px 30px;
-            font-size: 18px;
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            margin-bottom: 20px;
-        }
-
-        #start-button:disabled {
-            background-color: #888;
-            cursor: not-allowed;
-        }
-
-        /* Video Container */
-        #video-container {
-            position: relative;
-            width: 100%;
-            max-width: 600px;
-            aspect-ratio: 4 / 3; /* Maintains 4:3 Aspect Ratio */
-            background-color: #000;
-            overflow: hidden;
-            border-radius: 10px;
-        }
-
-        /* Video Element */
-        video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        /* Overlay Canvas for Visual Guidance */
-        #overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none; /* Allows clicks to pass through */
-            z-index: 10; /* Ensures overlay is above video */
-        }
-
-        /* Debug Message */
-        #debug-message {
-            margin-top: 10px;
-            color: #333;
-            text-align: center;
-            max-width: 600px;
-            word-wrap: break-word;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Web Barcode Scanner</title>
+  <style>
+    body { text-align: center; font-family: Arial, sans-serif; margin: 0; padding: 0; }
+    video { width: 100%; height: auto; }
+    #overlay { 
+      position: absolute; top: 0; left: 0; right: 0; bottom: 0; 
+      border: 2px dashed red; margin: auto; width: 80%; height: 20%; 
+    }
+    #result { margin: 20px; font-size: 1.5em; color: green; }
+  </style>
 </head>
 <body>
-    <!-- Start Scanner Button -->
-    <button id="start-button">Start Scanner</button>
+  <h1>Barcode Scanner</h1>
+  <video id="video" autoplay></video>
+  <div id="overlay"></div>
+  <div id="result">Result will appear here</div>
+  
+  <script type="module">
+    import { BrowserMultiFormatReader } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.19.0/esm/index.min.js';
 
-    <!-- Video Container -->
-    <div id="video-container">
-        <video id="video" autoplay muted playsinline></video>
-        <canvas id="overlay"></canvas>
-    </div>
+    const video = document.getElementById('video');
+    const resultDiv = document.getElementById('result');
+    const reader = new BrowserMultiFormatReader();
 
-    <!-- Debug Message -->
-    <div id="debug-message">Press "Start Scanner" to begin.</div>
+    async function startScanner() {
+      try {
+        // Request camera access
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+        video.srcObject = stream;
 
-    <!-- ZXing-js Library via CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.19.0/umd/index.min.js"></script>
-
-    <!-- Scanner Initialization Script -->
-    <script>
-        // Wait for the entire page to load
-        window.addEventListener('load', () => {
-            console.log("Page fully loaded.");
-
-            // Check if ZXing library is loaded
-            if (!window.ZXing) {
-                console.error("ZXing library not loaded.");
-                document.getElementById('debug-message').textContent = "Error: ZXing library not loaded.";
-                return;
-            }
-
-            console.log("ZXing library loaded successfully.");
-
-            // References to DOM elements
-            const startButton = document.getElementById('start-button');
-            const video = document.getElementById('video');
-            const overlay = document.getElementById('overlay');
-            const debugMessage = document.getElementById('debug-message');
-            const overlayContext = overlay.getContext('2d');
-
-            let codeReader = null;
-
-            // Function to draw a central rectangle as a guide
-            const drawOverlayGuide = () => {
-                // Clear any existing drawings
-                overlayContext.clearRect(0, 0, overlay.width, overlay.height);
-
-                // Draw central rectangle
-                const width = overlay.width;
-                const height = overlay.height;
-                const rectWidth = width * 0.6;
-                const rectHeight = height * 0.4;
-                const rectX = (width - rectWidth) / 2;
-                const rectY = (height - rectHeight) / 2;
-
-                overlayContext.strokeStyle = 'rgba(255, 0, 0, 0.8)';
-                overlayContext.lineWidth = 3;
-                overlayContext.strokeRect(rectX, rectY, rectWidth, rectHeight);
-            };
-
-            // Function to clear the overlay
-            const clearOverlay = () => {
-                overlayContext.clearRect(0, 0, overlay.width, overlay.height);
-            };
-
-            // Function to handle video metadata loaded
-            const handleVideoMetadata = () => {
-                // Resize overlay to match video dimensions
-                overlay.width = video.videoWidth;
-                overlay.height = video.videoHeight;
-                drawOverlayGuide();
-            };
-
-            // Function to start the scanner
-            const startScanner = () => {
-                console.log("Start Scanner button clicked.");
-                startButton.disabled = true;
-                debugMessage.textContent = "Requesting camera access...";
-
-                try {
-                    // Initialize the Barcode Reader
-                    codeReader = new ZXing.BrowserMultiFormatReader();
-                    console.log("BrowserMultiFormatReader initialized.");
-
-                    // Start decoding from the video stream
-                    codeReader.decodeFromVideoDevice(null, video, (result, err) => {
-                        if (result) {
-                            console.log("Barcode detected:", result.getText());
-                            alert(`Barcode detected: ${result.getText()}`);
-                            stopScanner();
-                        }
-                        if (err) {
-                            if (err instanceof ZXing.NotFoundException) {
-                                // No barcode found in this frame (normal operation)
-                                // Optionally, update debug message or provide visual cues
-                            } else {
-                                console.error("Error during scanning:", err);
-                                debugMessage.textContent = `Error: ${err.message}`;
-                                stopScanner();
-                            }
-                        }
-                    })
-                    .then(() => {
-                        debugMessage.textContent = "Scanning for barcodes...";
-                        console.log("ZXing-js started scanning.");
-                    })
-                    .catch((error) => {
-                        console.error("Initialization error:", error);
-                        alert(`Error initializing the scanner: ${error}`);
-                        debugMessage.textContent = "Failed to initialize scanner.";
-                        startButton.disabled = false;
-                    });
-
-                    // Draw overlay guide
-                    drawOverlayGuide();
-                } catch (error) {
-                    console.error("Exception during scanner initialization:", error);
-                    alert(`Exception initializing scanner: ${error}`);
-                    debugMessage.textContent = "Exception during scanner initialization.";
-                    startButton.disabled = false;
-                }
-            };
-
-            // Function to stop the scanner
-            const stopScanner = () => {
-                console.log("Stopping scanner.");
-                if (codeReader) {
-                    codeReader.reset();
-                    console.log("Scanner reset.");
-                }
-                debugMessage.textContent = "Scanner stopped.";
-                startButton.disabled = false;
-                clearOverlay();
-            };
-
-            // Add event listener to handle video metadata loaded
-            video.addEventListener('loadedmetadata', handleVideoMetadata);
-
-            // Add event listener for video errors
-            video.addEventListener('error', (e) => {
-                console.error("Video error:", e);
-                debugMessage.textContent = "Error accessing the camera.";
-                stopScanner();
-            });
-
-            // Event listener for the Start Scanner button
-            startButton.addEventListener('click', startScanner);
+        // Continuously scan for barcodes
+        reader.decodeFromVideoDevice(null, video, (result, err) => {
+          if (result) {
+            resultDiv.textContent = `Scanned Code: ${result.text}`;
+          }
+          if (err && !(err instanceof ZXing.NotFoundException)) {
+            console.error(err);
+          }
         });
-    </script>
+      } catch (err) {
+        console.error('Camera access denied:', err);
+        resultDiv.textContent = 'Unable to access the camera.';
+      }
+    }
+
+    startScanner();
+  </script>
 </body>
 </html>
