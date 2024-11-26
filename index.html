@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Minimal QuaggaJS Barcode Scanner</title>
+    <title>UPC Barcode Scanner</title>
     <style>
-        /* Container for the video stream */
+        /* Container for the video stream with 4:3 aspect ratio */
         #interactive {
             position: relative;
             width: 100%;
@@ -22,7 +22,7 @@
             cursor: pointer;
         }
         /* Overlay canvas styling */
-        canvas#overlay {
+        #overlay {
             position: absolute;
             top: 0;
             left: 0;
@@ -34,7 +34,10 @@
 </head>
 <body>
     <!-- Container where QuaggaJS will render the video -->
-    <div id="interactive"></div>
+    <div id="interactive">
+        <video id="video" autoplay playsinline></video>
+        <canvas id="overlay"></canvas>
+    </div>
     <!-- Button to start the scanner -->
     <button id="startButton">Start Scanner</button>
 
@@ -43,7 +46,9 @@
     <script>
         // Get references to DOM elements
         const startButton = document.getElementById('startButton');
-        const interactive = document.getElementById('interactive');
+        const video = document.getElementById('video');
+        const overlay = document.getElementById('overlay');
+        const overlayCtx = overlay.getContext('2d');
 
         // Function to start the scanner
         function startScanner() {
@@ -53,25 +58,21 @@
                     constraints: {
                         facingMode: "environment" // Use rear camera
                     },
-                    target: interactive // Target the interactive div
+                    target: video // Target the video element directly
                 },
                 decoder: {
                     readers: ["upc_reader", "upc_e_reader"] // Specify barcode types
                 },
                 locate: true, // Try to locate the barcode in the image
                 debug: {
-                    showCanvas: true, // Enable debugging visuals
-                    showPatches: true,
-                    showFoundPatches: true,
-                    showSkeleton: true,
-                    showLabels: true,
-                    showPatchLabels: true,
-                    showRemainingPatchLabels: true,
-                    boxFromPatches: {
-                        showTransformed: true,
-                        showTransformedBox: true,
-                        showBB: true
-                    }
+                    showCanvas: false, // Disable default canvas debugging
+                    showPatches: false,
+                    showFoundPatches: false,
+                    showSkeleton: false,
+                    showLabels: false,
+                    showPatchLabels: false,
+                    showRemainingPatchLabels: false,
+                    boxFromPatches: false
                 }
             }, function(err) {
                 if (err) {
@@ -95,20 +96,79 @@
 
             // Event Listener for Processed Frames (for debugging)
             Quagga.onProcessed((result) => {
+                // Clear the overlay canvas
+                overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
+
                 if (result) {
-                    // Draw debugging visuals
-                    Quagga.ImageDebug.drawPath(result.box, {x: 0, y: 1}, interactive, {color: 'green', lineWidth: 2});
+                    // Draw detected boxes
+                    if (result.boxes) {
+                        result.boxes.filter(box => box !== result.box).forEach(box => {
+                            drawPath(box, 'rgba(0, 255, 0, 0.3)');
+                        });
+                    }
+
+                    // Draw the main box
+                    if (result.box) {
+                        drawPath(result.box, '#00FF00');
+                    }
+
+                    // Draw the line where the barcode is detected
                     if (result.codeResult && result.codeResult.code) {
-                        Quagga.ImageDebug.drawPath(result.line, {x: 'x', y: 'y'}, interactive, {color: 'red', lineWidth: 3});
+                        drawPath(result.line, '#FF0000');
                     }
                 }
+
+                // Draw the red rectangle guide
+                drawGuideRectangle();
             });
+        }
+
+        // Function to draw paths on the overlay canvas
+        function drawPath(path, color) {
+            if (!path || path.length === 0) return;
+            overlayCtx.beginPath();
+            overlayCtx.moveTo(path[0].x, path[0].y);
+            path.forEach(point => {
+                overlayCtx.lineTo(point.x, point.y);
+            });
+            overlayCtx.lineWidth = 2;
+            overlayCtx.strokeStyle = color;
+            overlayCtx.stroke();
+        }
+
+        // Function to draw the red rectangle guide
+        function drawGuideRectangle() {
+            const width = overlay.width;
+            const height = overlay.height;
+            const rectWidth = width * 0.6; // 60% of the video width
+            const rectHeight = height * 0.2; // 20% of the video height
+            const rectX = (width - rectWidth) / 2; // Center horizontally
+            const rectY = (height - rectHeight) / 2; // Center vertically
+
+            // Draw the red rectangle
+            overlayCtx.beginPath();
+            overlayCtx.lineWidth = 4;
+            overlayCtx.strokeStyle = 'rgba(255, 0, 0, 0.7)'; // Red color with opacity
+            overlayCtx.rect(rectX, rectY, rectWidth, rectHeight);
+            overlayCtx.stroke();
         }
 
         // Start Scanner on Button Click
         startButton.addEventListener('click', () => {
             startScanner();
             console.log('Start Scanner button clicked.');
+        });
+
+        // Resize the overlay canvas to match video size
+        window.addEventListener('resize', () => {
+            overlay.width = video.clientWidth;
+            overlay.height = video.clientHeight;
+        });
+
+        // Initialize overlay size when video metadata is loaded
+        video.addEventListener('loadedmetadata', () => {
+            overlay.width = video.clientWidth;
+            overlay.height = video.clientHeight;
         });
     </script>
 </body>
