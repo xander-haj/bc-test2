@@ -94,11 +94,17 @@
 
     // Start the barcode scanner
     function startScanner() {
-      navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: { ideal: 'environment' }
-        }
-      }).then(stream => {
+      navigator.mediaDevices.enumerateDevices().then(devices => {
+  const videoDevices = devices.filter(device => device.kind === "videoinput");
+  const rearCamera = videoDevices.find(device => device.label.toLowerCase().includes("back")) || videoDevices[0];
+
+  return navigator.mediaDevices.getUserMedia({
+    video: {
+      deviceId: rearCamera.deviceId
+    }
+  });
+});
+.then(stream => {
         video.srcObject = stream;
 
         // Configure QuaggaJS
