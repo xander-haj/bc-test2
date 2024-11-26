@@ -1,146 +1,142 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mobile Barcode Scanner</title>
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      background-color: #000;
-      color: #fff;
-      font-family: Arial, sans-serif;
-      height: 100vh;
-    }
-
-    #video-container {
-      position: relative;
-      width: 100%;
-      max-width: 640px;
-      aspect-ratio: 4 / 3;
-      background-color: #000;
-      overflow: hidden;
-    }
-
-    #video {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-    }
-
-    #overlay {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      pointer-events: none;
-    }
-
-    #overlay .guide {
-      position: absolute;
-      border: 2px solid red;
-      width: 60%;
-      height: 20%;
-      top: 40%;
-      left: 20%;
-    }
-
-    #controls {
-      margin-top: 10px;
-    }
-
-    button {
-      padding: 10px 20px;
-      font-size: 16px;
-      background-color: #007bff;
-      color: #fff;
-      border: none;
-      border-radius: 5px;
-      cursor: pointer;
-    }
-
-    button:disabled {
-      background-color: #444;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Android Barcode Scanner with QuaggaJS</title>
+    <!-- QuaggaJS Library -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+    <style>
+        /* Container styling to maintain 4:3 aspect ratio */
+        #scanner-container {
+            position: relative;
+            width: 100%;
+            max-width: 480px; /* Adjust as needed */
+            margin: auto;
+            padding-top: 75%; /* 4:3 Aspect Ratio (height/width = 0.75) */
+            background: #000;
+        }
+        /* Video and overlay canvas positioning */
+        #video, #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        /* Start Scanner button styling */
+        #start-button {
+            display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            font-size: 16px;
+        }
+    </style>
 </head>
 <body>
-  <div id="video-container">
-    <video id="video" autoplay muted playsinline></video>
-    <div id="overlay">
-      <div class="guide"></div>
-    </div>
-  </div>
-  <div id="controls">
+    <!-- Start Scanner Button -->
     <button id="start-button">Start Scanner</button>
-    <button id="stop-button" disabled>Stop Scanner</button>
-  </div>
 
-  <!-- ZXing Library -->
- <script src="https://cdn.jsdelivr.net/npm/@zxing/browser@0.1.1/umd/index.min.js"></script>
-  <script>
-    const startButton = document.getElementById('start-button');
-    const stopButton = document.getElementById('stop-button');
-    const videoElement = document.getElementById('video');
-    let codeReader;
-    let stream;
+    <!-- Scanner Container with Video and Overlay -->
+    <div id="scanner-container">
+        <video id="video" autoplay muted></video>
+        <canvas id="overlay"></canvas>
+    </div>
 
-    async function startScanner() {
-      try {
-        // Request camera access
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' }
+    <script>
+        // Reference to the Start Scanner button
+        const startButton = document.getElementById('start-button');
+
+        // Event listener for the Start Scanner button
+        startButton.addEventListener('click', function() {
+            // Disable the button to prevent multiple initializations
+            startButton.disabled = true;
+
+            // Initialize QuaggaJS
+            Quagga.init({
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
+                    target: document.querySelector('#video'), // Video element
+                    constraints: {
+                        facingMode: "environment", // Use rear camera
+                        width: { ideal: 640 },
+                        height: { ideal: 480 }
+                    }
+                },
+                decoder: {
+                    readers: ["upc_reader"] // UPC barcode reader
+                },
+                locate: true, // Enable localization of barcodes
+                area: {
+                    top: "0%",    // Top offset
+                    right: "0%",  // Right offset
+                    left: "0%",   // Left offset
+                    bottom: "0%"  // Bottom offset
+                },
+                debug: {
+                    showCanvas: true, // Show the canvas overlay
+                    showPatches: false,
+                    showFoundPatches: false,
+                    showSkeleton: false,
+                    showLabels: false,
+                    showPatchLabels: false,
+                    showRemainingPatchLabels: false,
+                    boxFromPatches: {
+                        showTransformed: false,
+                        showTransformedBox: false,
+                        showBB: false
+                    }
+                }
+            }, function(err) {
+                if (err) {
+                    console.error(err);
+                    alert("Error initializing the scanner.");
+                    startButton.disabled = false;
+                    return;
+                }
+                // Start QuaggaJS
+                Quagga.start();
+            });
+
+            // Event handler when a barcode is detected
+            Quagga.onDetected(function(data) {
+                const code = data.codeResult.code;
+                console.log("Barcode detected: " + code);
+                alert("Barcode detected: " + code);
+                Quagga.stop(); // Stop the scanner after detection
+                startButton.disabled = false; // Re-enable the button
+            });
+
+            // Optional: Handle errors during scanning
+            Quagga.onProcessed(function(result) {
+                const overlay = document.getElementById('overlay');
+                const context = overlay.getContext('2d');
+                if (result) {
+                    // Clear previous drawings
+                    context.clearRect(0, 0, overlay.width, overlay.height);
+                    if (result.boxes) {
+                        result.boxes.filter(function(box) {
+                            return box !== result.box;
+                        }).forEach(function(box) {
+                            context.strokeStyle = "#00FF00";
+                            context.lineWidth = 2;
+                            context.strokeRect(box[0].x, box[0].y, box[2].x - box[0].x, box[2].y - box[0].y);
+                        });
+                    }
+                    if (result.box) {
+                        context.strokeStyle = "#FF0000";
+                        context.lineWidth = 2;
+                        context.strokeRect(result.box[0].x, result.box[0].y, result.box[2].x - result.box[0].x, result.box[2].y - result.box[0].y);
+                    }
+                    if (result.codeResult && result.codeResult.code) {
+                        context.font = "18px Arial";
+                        context.fillStyle = "#FF0000";
+                        context.fillText(result.codeResult.code, result.box[0].x, result.box[0].y - 10);
+                    }
+                }
+            });
         });
-
-        // Bind stream to video element
-        videoElement.srcObject = stream;
-
-        // Initialize ZXing Reader
-        codeReader = new ZXingBrowser.BrowserMultiFormatReader();
-        console.log('ZXing initialized:', codeReader);
-
-        // Start decoding barcodes
-        codeReader.decodeFromVideoElement(videoElement, (result, error) => {
-          if (result) {
-            console.log('Barcode detected:', result.text);
-            alert(`Barcode: ${result.text}`);
-            stopScanner(); // Stop scanning after detection
-          }
-          if (error) {
-            console.warn('Decode error:', error.message || error);
-          }
-        });
-
-        console.log('Scanner started.');
-        startButton.disabled = true;
-        stopButton.disabled = false;
-      } catch (err) {
-        console.error('Error accessing the camera:', err);
-        alert('Unable to access the camera. Please check permissions or reload the page.');
-      }
-    }
-
-    function stopScanner() {
-      if (codeReader) {
-        codeReader.reset();
-        console.log('ZXing scanner stopped.');
-      }
-      if (stream) {
-        stream.getTracks().forEach(track => track.stop());
-        console.log('Camera stream stopped.');
-      }
-      startButton.disabled = false;
-      stopButton.disabled = true;
-    }
-
-    startButton.addEventListener('click', startScanner);
-    stopButton.addEventListener('click', stopScanner);
-  </script>
+    </script>
 </body>
 </html>
