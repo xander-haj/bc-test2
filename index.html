@@ -1,189 +1,156 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>UPC Barcode Scanner</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <style>
-        /* Container for video and overlay with 4:3 aspect ratio */
-        #video-container {
-            position: relative;
-            width: 100%;
-            max-width: 600px;
-            aspect-ratio: 4 / 3;
-            margin: 0 auto;
-            background-color: #000;
-        }
-        /* Interactive div where QuaggaJS will render the video */
-        #interactive {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: 1;
-        }
-        /* Overlay canvas styling */
-        #overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 2;
-        }
-        /* Start Scanner button styling */
-        #startButton {
-            display: block;
-            margin: 20px auto;
-            padding: 10px 20px;
-            font-size: 16px;
-            cursor: pointer;
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mobile Barcode Scanner</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background-color: #000;
+      color: #fff;
+      font-family: Arial, sans-serif;
+      height: 100vh;
+    }
+
+    #video-container {
+      position: relative;
+      width: 100%;
+      max-width: 640px;
+      aspect-ratio: 4 / 3;
+      background-color: #000;
+      overflow: hidden;
+    }
+
+    #video-container video {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    #overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+    }
+
+    #overlay .guide {
+      position: absolute;
+      border: 2px solid red;
+      width: 60%;
+      height: 20%;
+      top: 40%;
+      left: 20%;
+    }
+
+    #controls {
+      margin-top: 10px;
+    }
+
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      background-color: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      background-color: #444;
+    }
+  </style>
 </head>
 <body>
-    <!-- Container where QuaggaJS will render the video -->
-    <div id="video-container">
-        <div id="interactive"></div>
-        <canvas id="overlay"></canvas>
-    </div>
-    <!-- Button to start the scanner -->
-    <button id="startButton">Start Scanner</button>
+  <div id="video-container">
+    <video id="video" autoplay></video>
+    <canvas id="overlay">
+      <div class="guide"></div>
+    </canvas>
+  </div>
+  <div id="controls">
+    <button id="start-button">Start Scanner</button>
+    <button id="stop-button" disabled>Stop Scanner</button>
+  </div>
 
-    <!-- Include Local QuaggaJS Library -->
-    <script src="lib/quagga.min.js"></script>
-    <script>
-        // Get references to DOM elements
-        const startButton = document.getElementById('startButton');
-        const interactive = document.getElementById('interactive');
-        const overlay = document.getElementById('overlay');
-        const overlayCtx = overlay.getContext('2d');
+  <script src="lib/quagga.min.js"></script>
+  <script>
+    const startButton = document.getElementById('start-button');
+    const stopButton = document.getElementById('stop-button');
+    const video = document.getElementById('video');
+    const overlay = document.getElementById('overlay');
+    const guide = document.createElement('div');
+    guide.className = 'guide';
+    overlay.appendChild(guide);
 
-        // Function to draw paths on the overlay canvas
-        function drawPath(path, color) {
-            if (!path || path.length === 0) return;
-            overlayCtx.beginPath();
-            overlayCtx.moveTo(path[0].x, path[0].y);
-            path.forEach(point => {
-                overlayCtx.lineTo(point.x, point.y);
-            });
-            overlayCtx.lineWidth = 2;
-            overlayCtx.strokeStyle = color;
-            overlayCtx.stroke();
+    // Start the barcode scanner
+    function startScanner() {
+      navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: { ideal: 'environment' }
         }
+      }).then(stream => {
+        video.srcObject = stream;
 
-        // Function to draw the red rectangle guide
-        function drawGuideRectangle() {
-            const width = overlay.width;
-            const height = overlay.height;
-            const rectWidth = width * 0.6; // 60% of the video width
-            const rectHeight = height * 0.2; // 20% of the video height
-            const rectX = (width - rectWidth) / 2; // Center horizontally
-            const rectY = (height - rectHeight) / 2; // Center vertically
+        // Configure QuaggaJS
+        Quagga.init({
+          inputStream: {
+            name: 'Live',
+            type: 'LiveStream',
+            target: video,
+            constraints: {
+              width: 640,
+              height: 480,
+              facingMode: 'environment'
+            }
+          },
+          decoder: {
+            readers: ['upc_reader']
+          },
+          locate: true, // Enables debugging visuals
+        }, (err) => {
+          if (err) {
+            console.error(err);
+            alert('Failed to initialize scanner.');
+            return;
+          }
+          Quagga.start();
+          startButton.disabled = true;
+          stopButton.disabled = false;
 
-            // Draw the red rectangle
-            overlayCtx.beginPath();
-            overlayCtx.lineWidth = 4;
-            overlayCtx.strokeStyle = 'rgba(255, 0, 0, 0.7)'; // Red color with opacity
-            overlayCtx.rect(rectX, rectY, rectWidth, rectHeight);
-            overlayCtx.stroke();
-        }
-
-        // Function to start the barcode scanner
-        function startScanner() {
-            Quagga.init({
-                inputStream: {
-                    type: "LiveStream",
-                    constraints: {
-                        facingMode: "environment" // Use rear camera
-                    },
-                    target: interactive // Target the interactive div
-                },
-                decoder: {
-                    readers: ["upc_reader", "upc_e_reader"] // Specify barcode types
-                },
-                locate: true, // Enable localization of barcodes
-                debug: {
-                    showCanvas: false,
-                    showPatches: false,
-                    showFoundPatches: false,
-                    showSkeleton: false,
-                    showLabels: false,
-                    showPatchLabels: false,
-                    showRemainingPatchLabels: false,
-                    boxFromPatches: false
-                }
-            }, function(err) {
-                if (err) {
-                    console.error('QuaggaJS initialization error:', err);
-                    alert('Error initializing barcode scanner. Check the console for details.');
-                    return;
-                }
-                Quagga.start();
-                console.log('QuaggaJS started.');
-                startButton.style.display = 'none'; // Hide start button after starting
-            });
-
-            // Event listener for detected barcodes
-            Quagga.onDetected((data) => {
-                const code = data.codeResult.code;
-                console.log('Barcode detected:', code);
-                alert('Barcode detected: ' + code);
-                Quagga.stop(); // Stop scanning after detection
-                startButton.style.display = 'block'; // Show start button again
-            });
-
-            // Event listener for processed frames to draw overlays
-            Quagga.onProcessed((result) => {
-                // Clear the overlay canvas
-                overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
-
-                if (result) {
-                    // Draw all detected boxes except the main one
-                    if (result.boxes) {
-                        result.boxes.filter(box => box !== result.box).forEach(box => {
-                            drawPath(box, 'rgba(0, 255, 0, 0.3)');
-                        });
-                    }
-
-                    // Draw the main detected box
-                    if (result.box) {
-                        drawPath(result.box, '#00FF00');
-                    }
-
-                    // Draw the line where the barcode was detected
-                    if (result.codeResult && result.codeResult.code) {
-                        drawPath(result.line, '#FF0000');
-                    }
-                }
-
-                // Draw the red rectangle guide
-                drawGuideRectangle();
-            });
-        }
-
-        // Function to resize the overlay canvas to match the interactive div size
-        function resizeOverlay() {
-            overlay.width = interactive.clientWidth;
-            overlay.height = interactive.clientHeight;
-            drawGuideRectangle();
-        }
-
-        // Event listener for window resize to adjust overlay
-        window.addEventListener('resize', resizeOverlay);
-
-        // Event listener for window load to set overlay size
-        window.addEventListener('load', () => {
-            resizeOverlay();
+          // Add detection event
+          Quagga.onDetected(result => {
+            const code = result.codeResult.code;
+            alert(`Barcode Detected: ${code}`);
+            stopScanner(); // Stop after detection
+          });
         });
+      }).catch(err => {
+        console.error(err);
+        alert('Camera access denied or unavailable.');
+      });
+    }
 
-        // Start the scanner when the start button is clicked
-        startButton.addEventListener('click', () => {
-            startScanner();
-            console.log('Start Scanner button clicked.');
-        });
-    </script>
+    // Stop the barcode scanner
+    function stopScanner() {
+      Quagga.stop();
+      video.srcObject.getTracks().forEach(track => track.stop());
+      startButton.disabled = false;
+      stopButton.disabled = true;
+    }
+
+    // Event listeners
+    startButton.addEventListener('click', startScanner);
+    stopButton.addEventListener('click', stopScanner);
+  </script>
 </body>
 </html>
