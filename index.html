@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Android Barcode Scanner with QuaggaJS</title>
-    <!-- QuaggaJS Library -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+    <title>Android Barcode Scanner with ZXing-js</title>
+    <!-- ZXing-js Library -->
+    <script src="https://unpkg.com/@zxing/library@0.19.0/umd/index.min.js"></script>
     <style>
         /* Container styling to maintain 4:3 aspect ratio and center content */
         #scanner-container {
@@ -82,14 +82,18 @@
         const debugMessage = document.getElementById('debug-message');
         const overlayContext = overlay.getContext('2d');
 
+        // Initialize ZXing Barcode Reader
+        const codeReader = new ZXing.BrowserMultiFormatReader();
+
         // Function to resize the overlay canvas to match video dimensions
         function resizeOverlay() {
             overlay.width = video.videoWidth;
             overlay.height = video.videoHeight;
+            drawOverlay(); // Redraw overlay after resizing
         }
 
         // Function to draw scan lines (for visual feedback)
-        function drawScanLines() {
+        function drawOverlay() {
             const width = overlay.width;
             const height = overlay.height;
             const lineSpacing = 20; // Adjust spacing between lines
@@ -102,157 +106,90 @@
                 overlayContext.lineTo(width, y);
                 overlayContext.stroke();
             }
+
+            // Draw a red rectangle in the center as a guide
+            const rectWidth = width * 0.6;
+            const rectHeight = height * 0.4;
+            const rectX = (width - rectWidth) / 2;
+            const rectY = (height - rectHeight) / 2;
+
+            overlayContext.strokeStyle = 'rgba(255, 0, 0, 0.8)';
+            overlayContext.lineWidth = 3;
+            overlayContext.strokeRect(rectX, rectY, rectWidth, rectHeight);
         }
 
-        // Function to initialize QuaggaJS
-        function initializeQuagga() {
-            Quagga.init({
-                inputStream: {
-                    name: "Live",
-                    type: "LiveStream",
-                    target: video, // Video element
-                    constraints: {
-                        facingMode: { exact: "environment" }, // Use rear camera
-                        width: { ideal: 1280 }, // Higher resolution
-                        height: { ideal: 720 }
-                    }
-                },
-                decoder: {
-                    readers: [
-                        "upc_reader",       // UPC-A, UPC-E
-                        "ean_reader",       // EAN-13, EAN-8
-                        "code_128_reader",  // Code 128
-                        "code_39_reader",   // Code 39
-                        "code_93_reader",   // Code 93
-                        "codabar_reader"    // Codabar
-                    ]
-                },
-                locate: true, // Enable localization of barcodes
-                multiple: false, // Stop after first barcode is detected
-                debug: {
-                    showCanvas: true, // Show the canvas overlay
-                    showPatches: true,
-                    showFoundPatches: true,
-                    showSkeleton: true,
-                    showLabels: true,
-                    showPatchLabels: false,
-                    showRemainingPatchLabels: false,
-                    boxFromPatches: {
-                        showTransformed: true,
-                        showTransformedBox: true,
-                        showBB: true
-                    }
-                }
-            }, function(err) {
-                if (err) {
-                    console.error("Quagga initialization error:", err);
-                    alert("Error initializing the scanner: " + err);
-                    startButton.disabled = false;
-                    debugMessage.textContent = "Scanner initialization failed.";
-                    return;
-                }
-                Quagga.start();
-                debugMessage.textContent = "Scanning for barcodes...";
-                console.log("QuaggaJS initialized successfully.");
-            });
+        // Function to initialize the scanner
+        function initializeScanner() {
+            debugMessage.textContent = "Initializing scanner...";
+            startButton.disabled = true;
 
-            // Event handler when a barcode is detected
-            Quagga.onDetected(function(data) {
-                const code = data.codeResult.code;
-                console.log("Barcode detected: " + code);
-                alert("Barcode detected: " + code);
-                Quagga.stop(); // Stop the scanner after detection
-                startButton.disabled = false; // Re-enable the button
-                debugMessage.textContent = "Barcode detected: " + code;
-            });
-
-            // Event handler for processed frames (for debugging)
-            Quagga.onProcessed(function(result) {
+            // Start decoding from the video stream
+            codeReader.decodeFromVideoDevice(null, video, (result, err) => {
                 if (result) {
-                    // Clear the overlay canvas
-                    overlayContext.clearRect(0, 0, overlay.width, overlay.height);
-
-                    // Draw scan lines for visual feedback
-                    drawScanLines();
-
-                    // Draw bounding boxes around detected barcodes
-                    if (result.boxes) {
-                        result.boxes.forEach(function(box) {
-                            overlayContext.strokeStyle = "rgba(0, 255, 0, 0.5)";
-                            overlayContext.lineWidth = 2;
-                            overlayContext.beginPath();
-                            box.forEach(function(point, index) {
-                                if (index === 0) {
-                                    overlayContext.moveTo(point.x, point.y);
-                                } else {
-                                    overlayContext.lineTo(point.x, point.y);
-                                }
-                            });
-                            overlayContext.closePath();
-                            overlayContext.stroke();
-                        });
-                    }
-
-                    // Highlight the currently detected barcode
-                    if (result.box) {
-                        overlayContext.strokeStyle = "rgba(255, 0, 0, 0.8)";
-                        overlayContext.lineWidth = 3;
-                        overlayContext.beginPath();
-                        result.box.forEach(function(point, index) {
-                            if (index === 0) {
-                                overlayContext.moveTo(point.x, point.y);
-                            } else {
-                                overlayContext.lineTo(point.x, point.y);
-                            }
-                        });
-                        overlayContext.closePath();
-                        overlayContext.stroke();
-                    }
-
-                    // Display the decoded barcode value
-                    if (result.codeResult && result.codeResult.code) {
-                        overlayContext.font = "18px Arial";
-                        overlayContext.fillStyle = "rgba(255, 0, 0, 0.8)";
-                        overlayContext.fillText(result.codeResult.code, result.box[0].x, result.box[0].y - 10);
-                    }
+                    // Barcode detected
+                    console.log("Barcode detected: " + result.getText());
+                    alert("Barcode detected: " + result.getText());
+                    stopScanner();
                 }
+                if (err && !(err instanceof ZXing.NotFoundException)) {
+                    console.error(err);
+                    debugMessage.textContent = "Error: " + err;
+                }
+            })
+            .then(() => {
+                debugMessage.textContent = "Scanning for barcodes...";
+                console.log("ZXing-js initialized successfully.");
+            })
+            .catch((err) => {
+                console.error("ZXing initialization error:", err);
+                alert("Error initializing the scanner: " + err);
+                startButton.disabled = false;
+                debugMessage.textContent = "Scanner initialization failed.";
             });
 
-            // Handle video play event to resize the overlay
-            video.addEventListener('play', function() {
-                resizeOverlay();
-            });
+            // Adjust overlay size when video metadata is loaded
+            video.addEventListener('loadedmetadata', resizeOverlay);
 
-            // Handle window resize to adjust overlay size
-            window.addEventListener('resize', function() {
+            // Redraw overlay when the video is resized
+            window.addEventListener('resize', () => {
                 if (!video.paused && !video.ended) {
                     resizeOverlay();
                 }
             });
+
+            // Draw initial overlay
+            video.addEventListener('play', () => {
+                drawOverlay();
+                // Continuously update the overlay
+                requestAnimationFrame(function loop() {
+                    if (!video.paused && !video.ended) {
+                        drawOverlay();
+                        requestAnimationFrame(loop);
+                    }
+                });
+            });
+        }
+
+        // Function to stop the scanner
+        function stopScanner() {
+            codeReader.reset();
+            debugMessage.textContent = "Scanner stopped.";
+            startButton.disabled = false;
         }
 
         // Event listener for the Start Scanner button
-        startButton.addEventListener('click', function() {
-            // Disable the button to prevent multiple initializations
-            startButton.disabled = true;
-            debugMessage.textContent = "Requesting camera access...";
-
-            // Request camera access and start video stream
-            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-                .then(function(stream) {
-                    video.srcObject = stream;
-                    video.setAttribute("playsinline", true); // Required for iOS Safari
-                    video.play();
-                    console.log("Camera stream started.");
-                    debugMessage.textContent = "Initializing scanner...";
-                    initializeQuagga();
-                })
-                .catch(function(err) {
-                    console.error("Camera access error:", err);
-                    alert("Unable to access the camera: " + err);
-                    startButton.disabled = false;
-                    debugMessage.textContent = "Camera access denied.";
-                });
+        startButton.addEventListener('click', () => {
+            // Check for camera permissions
+            navigator.permissions.query({ name: 'camera' }).then(function(permissionStatus) {
+                if (permissionStatus.state === 'granted' || permissionStatus.state === 'prompt') {
+                    initializeScanner();
+                } else {
+                    alert("Camera access is denied. Please enable it in your browser settings.");
+                }
+            }).catch((err) => {
+                console.error("Permission query error:", err);
+                initializeScanner(); // Proceed to initialize scanner if permission query fails
+            });
         });
     </script>
 </body>
