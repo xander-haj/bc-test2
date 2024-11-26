@@ -6,7 +6,7 @@
   <title>Barcode Scanner</title>
   <style>
     body { text-align: center; font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f4f4f4; }
-    video { width: 100%; height: auto; border: 1px solid #ccc; }
+    video { width: 100%; height: auto; border: 1px solid #ccc; display: none; }
     #overlay { 
       position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
       width: 80%; height: 30%; border: 2px dashed red; z-index: 2; pointer-events: none;
@@ -14,11 +14,13 @@
     #result, #history { margin: 20px; font-size: 1.2em; }
     #history { max-height: 200px; overflow-y: auto; background: #fff; padding: 10px; border: 1px solid #ccc; }
     #error { color: red; margin-top: 10px; }
+    #startButton { padding: 10px 20px; font-size: 1.2em; margin-top: 20px; cursor: pointer; }
   </style>
 </head>
 <body>
   <h1>Barcode Scanner</h1>
-  <div id="overlay"></div>
+  <button id="startButton">Start Scanner</button>
+  <div id="overlay" style="display: none;"></div>
   <video id="video" autoplay></video>
   <div id="result">Scanned Result: <span id="scannedText">None</span></div>
   <div id="history"><strong>Scan History:</strong></div>
@@ -31,15 +33,22 @@
     const resultDiv = document.getElementById('scannedText');
     const historyDiv = document.getElementById('history');
     const errorDiv = document.getElementById('error');
+    const overlay = document.getElementById('overlay');
+    const startButton = document.getElementById('startButton');
     const reader = new BrowserMultiFormatReader();
 
     async function startScanner() {
       try {
+        startButton.style.display = 'none';
+        overlay.style.display = 'block';
+        video.style.display = 'block';
+
         const constraints = {
           video: {
             facingMode: { exact: "environment" } // Use rear camera
           }
         };
+
         const stream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = stream;
 
@@ -61,10 +70,11 @@
       } catch (err) {
         console.error(err);
         errorDiv.textContent = "Camera access is blocked or not available.";
+        startButton.style.display = 'block';
       }
     }
 
-    startScanner();
+    startButton.addEventListener('click', startScanner);
   </script>
 </body>
 </html>
