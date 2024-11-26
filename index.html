@@ -4,21 +4,24 @@
     <meta charset="UTF-8">
     <title>Minimal QuaggaJS Barcode Scanner</title>
     <style>
-        /* Basic Styles for Video and Overlay */
-        #video-container {
+        /* Container for the video stream */
+        #interactive {
             position: relative;
             width: 100%;
             max-width: 600px;
             aspect-ratio: 4 / 3;
+            margin: 0 auto;
             background-color: #000;
-            margin: 0 auto; /* Center the container */
         }
-        video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
+        /* Start Scanner button styling */
+        #startButton {
             display: block;
+            margin: 20px auto;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
         }
+        /* Overlay canvas styling */
         canvas#overlay {
             position: absolute;
             top: 0;
@@ -27,30 +30,20 @@
             height: 100%;
             pointer-events: none;
         }
-        #startButton {
-            display: block;
-            margin: 20px auto;
-            padding: 10px 20px;
-            font-size: 16px;
-            cursor: pointer;
-        }
     </style>
 </head>
 <body>
-    <div id="video-container">
-        <video id="video" autoplay playsinline></video>
-        <canvas id="overlay"></canvas>
-    </div>
+    <!-- Container where QuaggaJS will render the video -->
+    <div id="interactive"></div>
+    <!-- Button to start the scanner -->
     <button id="startButton">Start Scanner</button>
 
     <!-- Include QuaggaJS via CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
     <script>
-        // Elements
+        // Get references to DOM elements
         const startButton = document.getElementById('startButton');
-        const video = document.getElementById('video');
-        const overlay = document.getElementById('overlay');
-        const overlayCtx = overlay.getContext('2d');
+        const interactive = document.getElementById('interactive');
 
         // Function to start the scanner
         function startScanner() {
@@ -58,27 +51,26 @@
                 inputStream: {
                     type: "LiveStream",
                     constraints: {
-                        facingMode: "environment" // Ensure rear camera is used
-                        // Removed width and height for flexibility
+                        facingMode: "environment" // Use rear camera
                     },
-                    target: video // Target the video element directly
+                    target: interactive // Target the interactive div
                 },
                 decoder: {
                     readers: ["upc_reader", "upc_e_reader"] // Specify barcode types
                 },
                 locate: true, // Try to locate the barcode in the image
                 debug: {
-                    showCanvas: true, // Enable for debugging
-                    showPatches: true, // Enable for debugging
-                    showFoundPatches: true, // Enable for debugging
-                    showSkeleton: true, // Enable for debugging
-                    showLabels: true, // Enable for debugging
-                    showPatchLabels: true, // Enable for debugging
-                    showRemainingPatchLabels: true, // Enable for debugging
+                    showCanvas: true, // Enable debugging visuals
+                    showPatches: true,
+                    showFoundPatches: true,
+                    showSkeleton: true,
+                    showLabels: true,
+                    showPatchLabels: true,
+                    showRemainingPatchLabels: true,
                     boxFromPatches: {
-                        showTransformed: true, // Enable for debugging
-                        showTransformedBox: true, // Enable for debugging
-                        showBB: true // Enable for debugging
+                        showTransformed: true,
+                        showTransformedBox: true,
+                        showBB: true
                     }
                 }
             }, function(err) {
@@ -103,55 +95,14 @@
 
             // Event Listener for Processed Frames (for debugging)
             Quagga.onProcessed((result) => {
-                overlayCtx.clearRect(0, 0, overlay.width, overlay.height);
                 if (result) {
-                    if (result.boxes) {
-                        result.boxes.filter(box => box !== result.box).forEach(box => {
-                            drawPath(box, 'rgba(0, 255, 0, 0.3)');
-                        });
-                    }
-
-                    if (result.box) {
-                        drawPath(result.box, '#00FF00');
-                    }
-
+                    // Draw debugging visuals
+                    Quagga.ImageDebug.drawPath(result.box, {x: 0, y: 1}, interactive, {color: 'green', lineWidth: 2});
                     if (result.codeResult && result.codeResult.code) {
-                        drawPath(result.line, '#FF0000');
+                        Quagga.ImageDebug.drawPath(result.line, {x: 'x', y: 'y'}, interactive, {color: 'red', lineWidth: 3});
                     }
                 }
-
-                // Draw the rectangle guide
-                drawGuideRectangle();
             });
-        }
-
-        // Function to draw paths on the canvas
-        function drawPath(path, color) {
-            if (!path || path.length === 0) return;
-            overlayCtx.beginPath();
-            overlayCtx.moveTo(path[0].x, path[0].y);
-            path.forEach(point => {
-                overlayCtx.lineTo(point.x, point.y);
-            });
-            overlayCtx.lineWidth = 2;
-            overlayCtx.strokeStyle = color;
-            overlayCtx.stroke();
-        }
-
-        // Function to draw the rectangle guide
-        function drawGuideRectangle() {
-            const width = overlay.width;
-            const height = overlay.height;
-            const rectWidth = width * 0.6; // 60% of the video width
-            const rectHeight = height * 0.2; // 20% of the video height
-            const rectX = (width - rectWidth) / 2; // Center horizontally
-            const rectY = (height - rectHeight) / 2; // Center vertically
-
-            overlayCtx.beginPath();
-            overlayCtx.lineWidth = 4;
-            overlayCtx.strokeStyle = 'rgba(255, 0, 0, 0.7)'; // Red color
-            overlayCtx.rect(rectX, rectY, rectWidth, rectHeight);
-            overlayCtx.stroke();
         }
 
         // Start Scanner on Button Click
