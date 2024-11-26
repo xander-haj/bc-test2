@@ -5,59 +5,91 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Barcode Scanner</title>
   <style>
-    body { text-align: center; font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f4f4f4; }
-    video { width: 100%; height: auto; border: 1px solid #ccc; display: none; }
-    #overlay { 
-      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-      width: 80%; height: 30%; border: 2px dashed red; z-index: 2; pointer-events: none;
+    body {
+      text-align: center;
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f4f4f4;
     }
-    #result, #history { margin: 20px; font-size: 1.2em; }
-    #history { max-height: 200px; overflow-y: auto; background: #fff; padding: 10px; border: 1px solid #ccc; }
-    #error { color: red; margin-top: 10px; }
-    #startButton { padding: 10px 20px; font-size: 1.2em; margin-top: 20px; cursor: pointer; }
+    video {
+      width: 90%;
+      max-width: 400px;
+      height: auto;
+      border: 2px solid #ccc;
+      margin: 20px 0;
+      display: none;
+    }
+    #startButton {
+      padding: 10px 20px;
+      font-size: 1.2em;
+      margin-top: 20px;
+      cursor: pointer;
+    }
+    #result {
+      font-size: 1.2em;
+      margin: 20px;
+    }
+    #history {
+      max-height: 150px;
+      overflow-y: auto;
+      padding: 10px;
+      background: white;
+      border: 1px solid #ccc;
+      margin: 20px auto;
+      width: 90%;
+      max-width: 400px;
+      font-size: 0.9em;
+    }
+    #error {
+      color: red;
+      margin-top: 10px;
+    }
   </style>
 </head>
 <body>
   <h1>Barcode Scanner</h1>
   <button id="startButton">Start Scanner</button>
-  <div id="overlay" style="display: none;"></div>
-  <video id="video" autoplay></video>
+  <video id="video" autoplay muted playsinline></video>
   <div id="result">Scanned Result: <span id="scannedText">None</span></div>
   <div id="history"><strong>Scan History:</strong></div>
   <div id="error"></div>
-  
-  <script type="module">
-    import { BrowserMultiFormatReader } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.19.0/esm/index.min.js';
 
+  <script type="module">
+    import { BrowserMultiFormatReader } from 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/esm/index.min.js';
+
+    const startButton = document.getElementById('startButton');
     const video = document.getElementById('video');
-    const resultDiv = document.getElementById('scannedText');
+    const resultText = document.getElementById('scannedText');
     const historyDiv = document.getElementById('history');
     const errorDiv = document.getElementById('error');
-    const overlay = document.getElementById('overlay');
-    const startButton = document.getElementById('startButton');
     const reader = new BrowserMultiFormatReader();
 
     async function startScanner() {
+      // Reset UI
+      resultText.textContent = 'None';
+      errorDiv.textContent = '';
+      historyDiv.innerHTML = '<strong>Scan History:</strong>';
+
       try {
-        startButton.style.display = 'none';
-        overlay.style.display = 'block';
+        // Request access to the rear camera
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: 'environment' } }
+        });
+
+        // Attach the video stream to the video element
+        video.srcObject = stream;
         video.style.display = 'block';
 
-        const constraints = {
-          video: {
-            facingMode: { exact: "environment" } // Use rear camera
-          }
-        };
-
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
-        video.srcObject = stream;
-
+        // Start scanning for barcodes
         reader.decodeFromVideoDevice(null, video, (result, err) => {
           if (result) {
             const code = result.text;
-            if (code !== resultDiv.textContent) {
-              resultDiv.textContent = code;
-              const historyItem = document.createElement("div");
+            if (code !== resultText.textContent) {
+              resultText.textContent = code;
+
+              // Add the result to history
+              const historyItem = document.createElement('div');
               historyItem.textContent = code;
               historyDiv.appendChild(historyItem);
             }
@@ -69,11 +101,11 @@
         });
       } catch (err) {
         console.error(err);
-        errorDiv.textContent = "Camera access is blocked or not available.";
-        startButton.style.display = 'block';
+        errorDiv.textContent = 'Error accessing camera: ' + err.message;
       }
     }
 
+    // Attach event listener to the start button
     startButton.addEventListener('click', startScanner);
   </script>
 </body>
