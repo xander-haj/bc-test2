@@ -63,6 +63,7 @@ document.addEventListener('DOMContentLoaded', function () {
             var self = this;
             Quagga.CameraAccess.enumerateVideoDevices().then(function (devices) {
                 var deviceSelection = document.getElementById("deviceSelection");
+                var currentValue = deviceSelection.value; // Get the current selected value
                 while (deviceSelection.firstChild) {
                     deviceSelection.removeChild(deviceSelection.firstChild);
                 }
@@ -70,10 +71,14 @@ document.addEventListener('DOMContentLoaded', function () {
                     var option = document.createElement("option");
                     option.value = device.deviceId || device.id;
                     option.text = device.label || device.deviceId || device.id;
+                    if (option.value === currentValue) {
+                        option.selected = true; // Set the option as selected
+                    }
                     deviceSelection.appendChild(option);
                 });
             });
         },
+        
         attachListeners: function () {
             var self = this;
 
