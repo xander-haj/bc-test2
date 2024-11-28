@@ -141,10 +141,14 @@ document.addEventListener('DOMContentLoaded', function () {
             var lastPart = parts.shift();
             target[lastPart] = value;
 
-            // If Quagga is running, we need to restart it with the new configuration
+            // If Quagga is running, we need to stop it and wait before restarting
             if (Quagga.initialized) {
-                self.stopScanner();
-                self.startScanner();
+                self.stopScanner().then(function () {
+                    self.startScanner();
+                }).catch(function (error) {
+                    console.error("Error restarting scanner:", error);
+                    self.handleError(error);
+                });
             }
         },
         inputMapper: {
@@ -241,26 +245,35 @@ document.addEventListener('DOMContentLoaded', function () {
         stopScanner: function () {
             var self = this;
             if (Quagga.initialized) {
-                Quagga.stop(); // Stops the scanner and video processing
-                Quagga.CameraAccess.release(); // Releases the camera
-                Quagga.offProcessed(self.onProcessed); // Removes the processed event listener
-                Quagga.offDetected(self.onDetected); // Removes the detected event listener
-                Quagga.initialized = false; // Sets the initialized flag to false
+                return new Promise(function (resolve, reject) {
+                    Quagga.stop(); // Stops the scanner and video processing
+                    Quagga.CameraAccess.release().then(function () {
+                        Quagga.offProcessed(self.onProcessed); // Removes the processed event listener
+                        Quagga.offDetected(self.onDetected); // Removes the detected event listener
+                        Quagga.initialized = false; // Sets the initialized flag to false
 
-                // Remove the video element from the DOM
-                var interactive = document.querySelector('#interactive');
-                while (interactive.firstChild) {
-                    interactive.removeChild(interactive.firstChild);
-                }
+                        // Remove the video element from the DOM
+                        var interactive = document.querySelector('#interactive');
+                        while (interactive.firstChild) {
+                            interactive.removeChild(interactive.firstChild);
+                        }
 
-                // Clear any overlays or results
-                var drawingCanvas = Quagga.canvas && Quagga.canvas.dom && Quagga.canvas.dom.overlay;
-                if (drawingCanvas) {
-                    var drawingCtx = Quagga.canvas.ctx.overlay;
-                    drawingCtx.clearRect(0, 0, drawingCanvas.getAttribute("width"), drawingCanvas.getAttribute("height"));
-                }
+                        // Clear any overlays or results
+                        var drawingCanvas = Quagga.canvas && Quagga.canvas.dom && Quagga.canvas.dom.overlay;
+                        if (drawingCanvas) {
+                            var drawingCtx = Quagga.canvas.ctx.overlay;
+                            drawingCtx.clearRect(0, 0, drawingCanvas.getAttribute("width"), drawingCanvas.getAttribute("height"));
+                        }
 
-                self._printCollectedResults(); // If you want to display collected results
+                        self._printCollectedResults(); // If you want to display collected results
+                        resolve(); // Resolve the promise after everything is done
+                    }).catch(function (error) {
+                        console.error("Error releasing camera:", error);
+                        reject(error);
+                    });
+                });
+            } else {
+                return Promise.resolve();
             }
         },
         onProcessed: function (result) {
