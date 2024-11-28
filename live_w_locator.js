@@ -12,7 +12,6 @@ document.addEventListener('DOMContentLoaded', function () {
         init: function () {
             this.lastResult = null;
             this.scannerRunning = false;
-            this.initializePerformanceMetrics();
             this.attachListeners();
             this.initCameraSelection();
         },
@@ -216,8 +215,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 try {
                     Quagga.stop(); // Stops the scanner and video processing
                     await Quagga.CameraAccess.release(); // Waits for the camera to be released
-                    Quagga.offProcessed(self.onProcessed.bind(self)); // Removes the processed event listener
-                    Quagga.offDetected(self.onDetected.bind(self)); // Removes the detected event listener
+                    Quagga.offProcessed(self.onProcessed); // Removes the processed event listener
+                    Quagga.offDetected(self.onDetected); // Removes the detected event listener
                     self.scannerRunning = false;
 
                     // Remove Quagga's video and canvas elements from the DOM
@@ -231,6 +230,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     canvases.forEach(function (canvas) {
                         interactive.removeChild(canvas);
                     });
+
+                    // Do not remove other child nodes (like #boundingBox)
 
                     // Clear any overlays or results
                     var drawingCanvas = Quagga.canvas && Quagga.canvas.dom && Quagga.canvas.dom.overlay;
@@ -276,10 +277,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     codeOverlay = document.createElement('div');
                     codeOverlay.id = 'codeOverlay';
                     codeOverlay.style.position = 'absolute';
-                    codeOverlay.style.top = '25%'; // Adjusted to match updated ROI
-                    codeOverlay.style.left = '15%'; // Adjusted to match updated ROI
-                    codeOverlay.style.width = '70%'; // Adjusted width
-                    codeOverlay.style.height = '50%'; // Adjusted height
+                    codeOverlay.style.top = '35%'; // Match the ROI top offset
+                    codeOverlay.style.left = '20%'; // Match the ROI left offset
+                    codeOverlay.style.width = '60%'; // Width between left and right offsets
+                    codeOverlay.style.height = '30%'; // Height between top and bottom offsets
                     codeOverlay.style.display = 'flex';
                     codeOverlay.style.alignItems = 'center';
                     codeOverlay.style.justifyContent = 'center';
@@ -294,11 +295,6 @@ document.addEventListener('DOMContentLoaded', function () {
             });
         },
         onProcessed: function (result) {
-            // Implement frame skipping
-            if (!this.performFrameSkipping()) {
-                return;
-            }
-
             var drawingCtx = Quagga.canvas.ctx.overlay,
                 drawingCanvas = Quagga.canvas.dom.overlay;
 
@@ -336,48 +332,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     });
                 }
             }
-
-            // Performance Metrics: Update FPS
-            if (this.lastProcessedTime) {
-                var now = performance.now();
-                var delta = now - this.lastProcessedTime;
-                var fps = 1000 / delta;
-                this.updateFPS(fps);
-            }
-            this.lastProcessedTime = performance.now();
-
-            // Periodically perform performance checks
-            if (performance.now() - this.lastPerformanceCheckTime > 5000) { // Every 5 seconds
-                this.performPerformanceChecks();
-                this.lastPerformanceCheckTime = performance.now();
-            }
         },
         onDetected: function (result) {
-            // Implement frame skipping
-            if (!this.performFrameSkipping()) {
-                return;
-            }
-
             var code = result.codeResult.code;
-            var confidence = result.codeResult.confidence || 0;
-
-            // Simple validation: UPC-A should be 12 digits
-            if (code.length !== 12) {
-                console.warn("Invalid UPC length:", code);
-                return;
-            }
-
-            // Update detection confidence
-            this.updateConfidence(confidence);
-
-            // Check lighting conditions based on image brightness
-            var imageData = Quagga.ImageDebug.getImageData();
-            var avgBrightness = this.calculateAverageBrightness(imageData);
-            if (avgBrightness < 100) { // Threshold for poor lighting
-                this.showLightingWarning(true);
-            } else {
-                this.showLightingWarning(false);
-            }
 
             if (this.lastResult !== code) {
                 this.lastResult = code;
@@ -430,177 +387,85 @@ document.addEventListener('DOMContentLoaded', function () {
                 ul.prepend(li);
             });
         },
-        // Initialize Performance Metrics
-        initializePerformanceMetrics: function () {
-            this.frameCount = 0;
-            this.startTime = performance.now();
-            this.fps = 0;
-            this.confidenceSum = 0;
-            this.confidenceCount = 0;
-            this.avgFPS = 0;
-            this.avgConfidence = 0;
-            this.patchSizes = ["medium", "small", "x-small"]; // Ordered from larger to smaller
-            this.currentPatchSizeIndex = 0; // Start with medium
-            this.frameProcessingThreshold = 50; // in ms, adjust as needed
-            this.lastPerformanceCheckTime = performance.now();
-            this.lastProcessedTime = null;
-            this.frameSkipCounter = 0;
-        },
-        // Update FPS Display
-        updateFPS: function (currentFPS) {
-            this.fps = currentFPS;
-            // Update average FPS over the last second
-            this.frameCount++;
-            var elapsed = performance.now() - this.startTime;
-            if (elapsed >= 1000) {
-                this.avgFPS = this.frameCount / (elapsed / 1000);
-                this.frameCount = 0;
-                this.startTime = performance.now();
-                document.getElementById('fps').textContent = this.avgFPS.toFixed(1);
-            } else {
-                document.getElementById('fps').textContent = this.fps.toFixed(1);
-            }
-        },
-        // Update Confidence Display
-        updateConfidence: function (confidence) {
-            this.confidenceSum += confidence;
-            this.confidenceCount++;
-            this.avgConfidence = this.confidenceSum / this.confidenceCount;
-            document.getElementById('confidence').textContent = this.avgConfidence.toFixed(2);
-        },
-        // Calculate Average Brightness of the Image
-        calculateAverageBrightness: function (imageData) {
-            var data = imageData.data;
-            var total = 0;
-            for (var i = 0; i < data.length; i += 4) {
-                // Simple average of RGB
-                total += (data[i] + data[i + 1] + data[i + 2]) / 3;
-            }
-            return total / (imageData.width * imageData.height);
-        },
-        // Show or Hide Lighting Warning
-        showLightingWarning: function (show) {
-            var warning = document.getElementById('lightingWarning');
-            if (show) {
-                warning.style.display = 'block';
-            } else {
-                warning.style.display = 'none';
-            }
-        },
-        // Dynamic Patch Size Adjustment based on performance
-        adjustPatchSize: function () {
-            // Example logic: If FPS is below a threshold, reduce patch size
-            if (this.avgFPS < 10 && this.currentPatchSizeIndex < this.patchSizes.length - 1) {
-                this.currentPatchSizeIndex++;
-                this.state.locator.patchSize = this.patchSizes[this.currentPatchSizeIndex];
-                console.log("Reducing patchSize to:", this.state.locator.patchSize);
-                this.setState("locator.patchSize", this.state.locator.patchSize);
-            } else if (this.avgFPS > 20 && this.currentPatchSizeIndex > 0) {
-                // If FPS is good, try increasing patchSize for better accuracy
-                this.currentPatchSizeIndex--;
-                this.state.locator.patchSize = this.patchSizes[this.currentPatchSizeIndex];
-                console.log("Increasing patchSize to:", this.state.locator.patchSize);
-                this.setState("locator.patchSize", this.state.locator.patchSize);
-            }
-        },
-        // Periodic performance checks
-        performPerformanceChecks: function () {
-            // Call adjustPatchSize based on current performance metrics
-            this.adjustPatchSize();
-        },
-        // Frame Skipping based on frequency
-        performFrameSkipping: function () {
-            // Implement frame skipping based on frequency
-            this.frameSkipCounter = (this.frameSkipCounter || 0) + 1;
-            if (this.frameSkipCounter >= this.state.frequency) {
-                this.frameSkipCounter = 0;
-                return true; // Process this frame
-            }
-            return false; // Skip this frame
-        },
-    };
-
-    // Initialize the application
-    App.init();
-
-    // Define inputMapper and state outside the App object to prevent duplication
-    App.inputMapper = {
-        inputStream: {
-            constraints: {
-                width: function (value) {
-                    return { min: parseInt(value) };
-                },
-                height: function (value) {
-                    return { min: parseInt(value) };
-                },
-                deviceId: function (value) {
-                    return value;
+        inputMapper: {
+            inputStream: {
+                constraints: {
+                    width: function (value) {
+                        return { min: parseInt(value) };
+                    },
+                    height: function (value) {
+                        return { min: parseInt(value) };
+                    },
+                    deviceId: function (value) {
+                        return value;
+                    },
                 },
             },
-        },
-        numOfWorkers: function (value) {
-            return parseInt(value);
-        },
-        decoder: {
-            readers: function (value) {
-                if (value === "ean_extended") {
+            numOfWorkers: function (value) {
+                return parseInt(value);
+            },
+            decoder: {
+                readers: function (value) {
+                    if (value === "ean_extended") {
+                        return [
+                            {
+                                format: "ean_reader",
+                                config: {
+                                    supplements: ["ean_5_reader", "ean_2_reader"],
+                                },
+                            },
+                        ];
+                    }
                     return [
                         {
-                            format: "ean_reader",
-                            config: {
-                                supplements: ["ean_5_reader", "ean_2_reader"],
-                            },
+                            format: value + "_reader",
+                            config: {},
                         },
                     ];
-                }
-                return [
-                    {
-                        format: value + "_reader",
-                        config: {},
-                    },
-                ];
+                },
+            },
+            locator: {
+                patchSize: function (value) {
+                    return value;
+                },
+                halfSample: function (value) {
+                    return (value === 'true' || value === true);
+                },
             },
         },
-        locator: {
-            patchSize: function (value) {
-                return value;
+        state: {
+            inputStream: {
+                type: "LiveStream",
+                constraints: {
+                    width: { min: 640 },
+                    height: { min: 480 },
+                    facingMode: "environment",
+                    aspectRatio: { min: 1, max: 2 },
+                    deviceId: null, // Ensure deviceId is included
+                },
+                area: { // defines rectangle of the detection/localization area
+                    top: "35%",    // top offset
+                    right: "20%",  // right offset
+                    left: "20%",   // left offset
+                    bottom: "35%"  // bottom offset
+                },
+                target: document.querySelector("#interactive"),
             },
-            halfSample: function (value) {
-                return (value === 'true' || value === true);
+            locator: {
+                patchSize: "medium",
+                halfSample: true,
             },
+            numOfWorkers: 4,
+            decoder: {
+                readers: [
+                    { format: "code_128_reader", config: {} }, 
+                    { format: "upc_reader", config: {} },
+                    { format: "upc_e_reader", config: {} },
+                ],
+            },
+            locate: true,
         },
     };
 
-    App.state = {
-        inputStream: {
-            type: "LiveStream",
-            constraints: {
-                width: { min: 1280 }, // Optimized resolution
-                height: { min: 720 }, // Optimized resolution
-                facingMode: "environment",
-                aspectRatio: { min: 1, max: 2 },
-                deviceId: null, // Ensure deviceId is included
-            },
-            area: { // defines rectangle of the detection/localization area
-                top: "25%",    // Adjusted top offset
-                right: "15%",  // Adjusted right offset
-                left: "15%",   // Adjusted left offset
-                bottom: "25%"  // Adjusted bottom offset
-            },
-            target: document.querySelector("#interactive"),
-        },
-        locator: {
-            patchSize: "medium", // Optimized patch size
-            halfSample: false, // Disabled half-sample for better accuracy
-        },
-        numOfWorkers: 4, // Optimized workers count
-        decoder: {
-            readers: [
-                { format: "upc_reader", config: {} }, // Only UPC readers
-                { format: "upc_e_reader", config: {} },
-            ],
-        },
-        locate: true,
-        frequency: 10, // Process every 10 frames
-    };
+    App.init();
 });
