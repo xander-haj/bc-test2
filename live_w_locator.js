@@ -1,4 +1,21 @@
 document.addEventListener('DOMContentLoaded', function () {
+    function mergeRecursive(obj1, obj2) {
+        for (var p in obj2) {
+            if (obj2.hasOwnProperty(p)) {
+                try {
+                    if (obj2[p].constructor === Object) {
+                        obj1[p] = mergeRecursive(obj1[p] || {}, obj2[p]);
+                    } else {
+                        obj1[p] = obj2[p];
+                    }
+                } catch (e) {
+                    obj1[p] = obj2[p];
+                }
+            }
+        }
+        return obj1;
+    }
+
     var resultCollector = Quagga.ResultCollector.create({
         capture: true,
         capacity: 20,
@@ -135,34 +152,38 @@ document.addEventListener('DOMContentLoaded', function () {
             var self = this;
             self.disableControls(true);
 
-            var keys = path.split('.');
-            var target = self.state;
-            var lastKey = keys.pop();
+            var mappedValue = value;
+            var mapping = self.inputMapper;
+            var pathParts = path.split('.');
 
-            // Navigate to the correct target in the state object
-            keys.forEach(function (key) {
-                if (typeof target[key] !== 'object') {
-                    target[key] = {};
+            // Apply input mapping
+            pathParts.forEach(function (part, index) {
+                if (mapping && mapping.hasOwnProperty(part)) {
+                    mapping = mapping[part];
+                    if (typeof mapping === 'function') {
+                        mappedValue = mapping(value);
+                    }
+                } else {
+                    mapping = null;
                 }
-                target = target[key];
             });
+
+            // Deep merge the new value into the state
+            var newState = {};
+            var temp = newState;
+            for (var i = 0; i < pathParts.length - 1; i++) {
+                temp[pathParts[i]] = {};
+                temp = temp[pathParts[i]];
+            }
+            temp[pathParts[pathParts.length - 1]] = mappedValue;
+
+            self.state = mergeRecursive(self.state, newState);
 
             var needsRestart = false;
 
             // Determine if the change requires a restart
-            if (path.startsWith('inputStream.constraints.deviceId') || path.startsWith('decoder.readers')) {
+            if (path.startsWith('inputStream') || path.startsWith('decoder')) {
                 needsRestart = true;
-            }
-
-            // Merge new value with existing value for constraints to preserve other properties
-            if (path.startsWith('inputStream.constraints')) {
-                // Merge constraints
-                target.constraints = {
-                    ...target.constraints,
-                    [lastKey]: value
-                };
-            } else {
-                target[lastKey] = value;
             }
 
             if (needsRestart) {
