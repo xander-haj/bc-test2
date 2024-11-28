@@ -254,65 +254,65 @@ document.addEventListener('DOMContentLoaded', function () {
                 self.checkCapabilities();
                 Quagga.onProcessed(self.onProcessed.bind(self));
                 Quagga.onDetected(self.onDetected.bind(self));
-
+        
                 // Ensure the bounding box is present
                 var interactive = document.querySelector('#interactive');
-                var boundingBox = document.querySelector('#boundingBox');
+                var boundingBox = document.getElementById('boundingBox');
                 if (!boundingBox) {
                     // If bounding box is missing, create and append it
                     boundingBox = document.createElement('div');
                     boundingBox.id = 'boundingBox';
                     interactive.appendChild(boundingBox);
                 }
+        
+                // Create the code overlay
+                var codeOverlay = document.getElementById('codeOverlay');
+                if (!codeOverlay) {
+                    codeOverlay = document.createElement('div');
+                    codeOverlay.id = 'codeOverlay';
+                    codeOverlay.style.position = 'absolute';
+                    codeOverlay.style.top = '35%'; // Match the ROI top offset
+                    codeOverlay.style.left = '20%'; // Match the ROI left offset
+                    codeOverlay.style.width = '60%'; // Width between left and right offsets
+                    codeOverlay.style.height = '30%'; // Height between top and bottom offsets
+                    codeOverlay.style.display = 'flex';
+                    codeOverlay.style.alignItems = 'center';
+                    codeOverlay.style.justifyContent = 'center';
+                    codeOverlay.style.color = '#FFFFFF';
+                    codeOverlay.style.fontSize = '24px';
+                    codeOverlay.style.fontWeight = 'bold';
+                    codeOverlay.style.textAlign = 'center';
+                    codeOverlay.style.pointerEvents = 'none';
+                    codeOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.5)'; // Optional background for readability
+                    interactive.appendChild(codeOverlay);
+                }
             });
         },
-        onProcessed: function (result) {
-            var drawingCtx = Quagga.canvas.ctx.overlay,
-                drawingCanvas = Quagga.canvas.dom.overlay;
-
-            if (result) {
-                if (result.boxes) {
-                    drawingCtx.clearRect(
-                        0,
-                        0,
-                        parseInt(drawingCanvas.getAttribute("width")),
-                        parseInt(drawingCanvas.getAttribute("height"))
-                    );
-                    result.boxes
-                        .filter(function (box) {
-                            return box !== result.box;
-                        })
-                        .forEach(function (box) {
-                            Quagga.ImageDebug.drawPath(box, { x: 0, y: 1 }, drawingCtx, {
-                                color: "green",
-                                lineWidth: 2,
-                            });
-                        });
-                }
-
-                if (result.box) {
-                    Quagga.ImageDebug.drawPath(result.box, { x: 0, y: 1 }, drawingCtx, {
-                        color: "#00F",
-                        lineWidth: 2,
-                    });
-                }
-
-                if (result.codeResult && result.codeResult.code) {
-                    Quagga.ImageDebug.drawPath(result.line, { x: "x", y: "y" }, drawingCtx, {
-                        color: "red",
-                        lineWidth: 3,
-                    });
-                }
-            }
-        },
+        
         onDetected: function (result) {
             var code = result.codeResult.code;
-
+        
             if (this.lastResult !== code) {
                 this.lastResult = code;
+        
+                // Update the code overlay
+                var codeOverlay = document.getElementById('codeOverlay');
+                if (codeOverlay) {
+                    codeOverlay.textContent = code;
+                }
+        
+                // Optionally, clear the overlay after a delay
+                setTimeout(function () {
+                    var overlay = document.getElementById('codeOverlay');
+                    if (overlay) {
+                        overlay.textContent = '';
+                    }
+                }, 3000); // Adjust the delay as needed
+        
+                // Existing code to display the result in the result strip
                 var node = document.createElement("li");
                 var canvas = Quagga.canvas.dom.image;
-
+        
                 node.innerHTML =
                     '<div class="thumbnail"><div class="imgWrapper"><img src="' +
                     canvas.toDataURL() +
@@ -322,6 +322,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 document.querySelector("#result_strip ul.thumbnails").prepend(node);
             }
         },
+        
         _printCollectedResults: function () {
             var results = resultCollector.getResults(),
                 ul = document.querySelector("#result_strip ul.collector");
@@ -412,7 +413,11 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             numOfWorkers: 4,
             decoder: {
-                readers: [{ format: "code_128_reader", config: {} }],
+                readers: [
+                    { format: "code_128_reader", config: {} }, 
+                    { format: "upc_reader", config: {} },
+                    { format: "upc_e_reader", config: {} },
+                ],
             },
             locate: true,
         },
