@@ -21,25 +21,10 @@
     border: 2px dashed red;
     width: 60%;
     height: 30%;
-    top: 25%; /* Adjusted to match ROI */
-    left: 15%; /* Adjusted to match ROI */
+    top: 35%;
+    left: 20%;
     box-sizing: border-box;
     pointer-events: none;
-  }
-
-  #feedback {
-    margin-top: 10px;
-    font-family: Arial, sans-serif;
-  }
-
-  #feedback p {
-    margin: 5px 0;
-  }
-
-  #lightingWarning {
-    color: red;
-    display: none;
-    font-weight: bold;
   }
   </style>
 </head>
@@ -64,8 +49,18 @@
           <label>
             <span>Barcode-Type</span>
             <select name="decoder_readers">
-              <option value="upc" selected="selected">UPC</option>
-              <!-- Remove other barcode types as you're focusing on UPC -->
+              <option value="code_128" selected="selected">Code 128</option>
+              <option value="code_39">Code 39</option>
+              <option value="code_39_vin">Code 39 VIN</option>
+              <option value="ean">EAN</option>
+              <option value="ean_extended">EAN-extended</option>
+              <option value="ean_8">EAN-8</option>
+              <option value="upc">UPC</option>
+              <option value="upc_e">UPC-E</option>
+              <option value="codabar">Codabar</option>
+              <option value="i2of5">I2of5</option>
+              <option value="2of5">Standard 2 of 5</option>
+              <option value="code_93">Code 93</option>
             </select>
           </label>
 
@@ -74,9 +69,9 @@
             <span>Resolution Width (px)</span>
             <select name="inputStream_constraints_width">
               <option value="320">320px</option>
-              <option value="640">640px</option>
+              <option selected="selected" value="640">640px</option>
               <option value="800">800px</option>
-              <option value="1280" selected="selected">1280px</option>
+              <option value="1280">1280px</option>
               <option value="1600">1600px</option>
               <option value="1920">1920px</option>
             </select>
@@ -85,9 +80,9 @@
             <span>Resolution Height (px)</span>
             <select name="inputStream_constraints_height">
               <option value="240">240px</option>
-              <option value="480">480px</option>
+              <option selected="selected" value="480">480px</option>
               <option value="600">600px</option>
-              <option value="720" selected="selected">720px</option>
+              <option value="720">720px</option>
               <option value="960">960px</option>
               <option value="1080">1080px</option>
             </select>
@@ -98,14 +93,14 @@
             <select name="locator_patchSize">
               <option value="x-small">x-small</option>
               <option value="small">small</option>
-              <option value="medium" selected="selected">medium</option>
+              <option selected="selected" value="medium">medium</option>
               <option value="large">large</option>
               <option value="x-large">x-large</option>
             </select>
           </label>
           <label>
             <span>Half-Sample</span>
-            <input type="checkbox" name="locator_halfSample" />
+            <input type="checkbox" checked="checked" name="locator_halfSample" />
           </label>
           <label>
             <span>Workers</span>
@@ -113,7 +108,7 @@
               <option value="0">0</option>
               <option value="1">1</option>
               <option value="2">2</option>
-              <option value="4" selected="selected">4</option>
+              <option selected="selected" value="4">4</option>
               <option value="8">8</option>
             </select>
           </label>
@@ -132,14 +127,6 @@
         </fieldset>
       </div>
       <div id="loadingIndicator" style="display: none;">Loading...</div>
-      
-      <!-- Real-Time Feedback Section -->
-      <div id="feedback">
-        <p>FPS: <span id="fps">0</span></p>
-        <p>Detection Confidence: <span id="confidence">0</span></p>
-        <p id="lightingWarning">Poor lighting detected!</p>
-      </div>
-
       <div id="result_strip">
         <ul class="thumbnails"></ul>
       </div>
