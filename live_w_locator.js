@@ -11,6 +11,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var App = {
         init: function () {
             this.lastResult = null;
+            this.scannerRunning = false; // Track if the scanner is running
             this.attachListeners();
             this.initCameraSelection();
         },
@@ -21,7 +22,7 @@ document.addEventListener('DOMContentLoaded', function () {
         checkCapabilities: function () {
             var track = Quagga.CameraAccess.getActiveTrack();
             var capabilities = {};
-            if (typeof track.getCapabilities === "function") {
+            if (typeof track?.getCapabilities === "function") {
                 capabilities = track.getCapabilities();
             }
             this.applySettingsVisibility("zoom", capabilities.zoom);
@@ -165,13 +166,18 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             if (needsRestart) {
-                try {
-                    await self.stopScanner();
-                    await self.startScanner();
-                } catch (error) {
-                    console.error("Error restarting scanner:", error);
-                    self.handleError(error);
-                } finally {
+                if (self.scannerRunning) {
+                    try {
+                        await self.stopScanner();
+                        await self.startScanner();
+                    } catch (error) {
+                        console.error("Error restarting scanner:", error);
+                        self.handleError(error);
+                    } finally {
+                        self.disableControls(false);
+                    }
+                } else {
+                    // Scanner is not running; just update the state
                     self.disableControls(false);
                 }
             } else {
@@ -196,13 +202,13 @@ document.addEventListener('DOMContentLoaded', function () {
         },
         stopScanner: async function () {
             var self = this;
-            if (Quagga.initialized) {
+            if (self.scannerRunning) {
                 try {
                     Quagga.stop(); // Stops the scanner and video processing
                     await Quagga.CameraAccess.release(); // Waits for the camera to be released
                     Quagga.offProcessed(self.onProcessed); // Removes the processed event listener
                     Quagga.offDetected(self.onDetected); // Removes the detected event listener
-                    Quagga.initialized = false; // Sets the initialized flag to false
+                    self.scannerRunning = false;
 
                     // Remove Quagga's video and canvas elements from the DOM
                     var interactive = document.querySelector('#interactive');
@@ -235,32 +241,27 @@ document.addEventListener('DOMContentLoaded', function () {
         },
         startScanner: async function () {
             var self = this;
-            return new Promise(function (resolve, reject) {
-                Quagga.init(self.state, function (err) {
-                    if (err) {
-                        self.handleError(err);
-                        reject(err);
-                        return;
-                    }
-                    Quagga.start();
-                    Quagga.initialized = true; // Set initialized to true
-                    self.initCameraSelection();
-                    self.checkCapabilities();
-                    Quagga.onProcessed(self.onProcessed.bind(self));
-                    Quagga.onDetected(self.onDetected.bind(self));
+            Quagga.init(self.state, function (err) {
+                if (err) {
+                    self.handleError(err);
+                    return;
+                }
+                Quagga.start();
+                self.scannerRunning = true;
+                self.initCameraSelection();
+                self.checkCapabilities();
+                Quagga.onProcessed(self.onProcessed.bind(self));
+                Quagga.onDetected(self.onDetected.bind(self));
 
-                    // Ensure the bounding box is present
-                    var interactive = document.querySelector('#interactive');
-                    var boundingBox = document.querySelector('#boundingBox');
-                    if (!boundingBox) {
-                        // If bounding box is missing, create and append it
-                        boundingBox = document.createElement('div');
-                        boundingBox.id = 'boundingBox';
-                        interactive.appendChild(boundingBox);
-                    }
-
-                    resolve();
-                });
+                // Ensure the bounding box is present
+                var interactive = document.querySelector('#interactive');
+                var boundingBox = document.querySelector('#boundingBox');
+                if (!boundingBox) {
+                    // If bounding box is missing, create and append it
+                    boundingBox = document.createElement('div');
+                    boundingBox.id = 'boundingBox';
+                    interactive.appendChild(boundingBox);
+                }
             });
         },
         onProcessed: function (result) {
@@ -383,7 +384,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     return value;
                 },
                 halfSample: function (value) {
-                    return value;
+                    return value === 'true' || value === true;
                 },
             },
         },
