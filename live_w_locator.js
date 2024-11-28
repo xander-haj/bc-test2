@@ -19,36 +19,20 @@ $(function () {
         init: function () {
             var self = this;
 
-            // Check for camera access permissions
-            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                navigator.mediaDevices
-                    .getUserMedia({ video: { facingMode: "environment" } })
-                    .then(function (stream) {
-                        // Initialize Quagga after permissions are granted
-                        Quagga.init(self.state, function (err) {
-                            if (err) {
-                                return self.handleError(err);
-                            }
-                            App.attachListeners();
-                            App.checkCapabilities();
-                            Quagga.start();
-                        });
-                    })
-                    .catch(function (err) {
-                        // Handle permission denial or errors
-                        console.error("Camera access denied or unavailable:", err);
-                        alert(
-                            "Camera access is required to use the barcode scanner. Please enable camera permissions."
-                        );
-                    });
-            } else {
-                alert(
-                    "Your browser does not support the required Camera API. Please update to a modern browser."
-                );
-            }
+            // Initialize Quagga directly without manual getUserMedia call
+            Quagga.init(self.state, function (err) {
+                if (err) {
+                    return self.handleError(err);
+                }
+                // Start the scanner after Quagga is initialized
+                Quagga.start();
+                App.attachListeners();
+                App.checkCapabilities();
+            });
         },
         handleError: function (err) {
             console.log(err);
+            alert('Error initializing Quagga: ' + err);
         },
         checkCapabilities: function () {
             var track = Quagga.CameraAccess.getActiveTrack();
@@ -165,31 +149,105 @@ $(function () {
                 $ul.prepend($li);
             });
         },
+        setState: function (path, value) {
+            var self = this;
+
+            if (typeof self._accessByPath(self.inputMapper, path) === "function") {
+                value = self._accessByPath(self.inputMapper, path)(value);
+            }
+
+            self._accessByPath(self.state, path, value);
+
+            console.log(JSON.stringify(self.state));
+            App.detachListeners();
+            Quagga.stop();
+            App.init();
+        },
+        detachListeners: function () {
+            $(".controls").off("click", "button.stop");
+            $(".controls .reader-config-group").off("change", "input, select");
+        },
+        inputMapper: {
+            inputStream: {
+                constraints: function (value) {
+                    if (/^(\d+)x(\d+)$/.test(value)) {
+                        var values = value.split('x');
+                        return {
+                            width: { min: parseInt(values[0]) },
+                            height: { min: parseInt(values[1]) }
+                        };
+                    }
+                    return {
+                        deviceId: value
+                    };
+                }
+            },
+            numOfWorkers: function (value) {
+                return parseInt(value);
+            },
+            decoder: {
+                readers: function (value) {
+                    if (value === 'ean_extended') {
+                        return [{
+                            format: "ean_reader",
+                            config: {
+                                supplements: [
+                                    'ean_5_reader', 'ean_2_reader'
+                                ]
+                            }
+                        }];
+                    }
+                    return [{
+                        format: value + "_reader",
+                        config: {}
+                    }];
+                }
+            }
+        },
+        _accessByPath: function (obj, path, val) {
+            var parts = path.split('.'),
+                depth = parts.length,
+                setter = typeof val !== "undefined" ? true : false;
+
+            return parts.reduce(function (o, key, i) {
+                if (setter && (i + 1) === depth) {
+                    if (typeof o[key] === "object" && typeof val === "object") {
+                        Object.assign(o[key], val);
+                    } else {
+                        o[key] = val;
+                    }
+                }
+                return key in o ? o[key] : {};
+            }, obj);
+        },
         state: {
             inputStream: {
                 type: "LiveStream",
                 constraints: {
+                    facingMode: "environment", // Use rear camera
                     width: { min: 640 },
                     height: { min: 480 },
-                    facingMode: "environment",
-                    aspectRatio: { min: 1, max: 2 },
-                },
+                    aspectRatio: { min: 1, max: 2 }
+                }
             },
             locator: {
                 patchSize: "medium",
-                halfSample: true,
+                halfSample: true
             },
             numOfWorkers: 2,
             frequency: 10,
             decoder: {
-                readers: [{ format: "code_128_reader", config: {} }],
+                readers: [{ format: "code_128_reader", config: {} }]
             },
-            locate: true,
+            locate: true
         },
-        lastResult: null,
+        lastResult: null
     };
 
-    App.init();
+    // Add event listener for the Start Scanner button
+    document.getElementById('startScanner').addEventListener('click', function() {
+        App.init();
+    });
 
     Quagga.onProcessed(function (result) {
         var drawingCtx = Quagga.canvas.ctx.overlay,
