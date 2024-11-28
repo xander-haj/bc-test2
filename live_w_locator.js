@@ -209,11 +209,19 @@ document.addEventListener('DOMContentLoaded', function () {
                     Quagga.offDetected(self.onDetected); // Removes the detected event listener
                     Quagga.initialized = false; // Sets the initialized flag to false
 
-                    // Remove the video element from the DOM
+                    // Remove Quagga's video and canvas elements from the DOM
                     var interactive = document.querySelector('#interactive');
-                    while (interactive.firstChild) {
-                        interactive.removeChild(interactive.firstChild);
+                    var video = interactive.querySelector('video');
+                    if (video) {
+                        interactive.removeChild(video);
                     }
+                    // Remove Quagga's canvas overlays
+                    var canvases = interactive.querySelectorAll('canvas');
+                    canvases.forEach(function (canvas) {
+                        interactive.removeChild(canvas);
+                    });
+
+                    // Do not remove other child nodes (like #boundingBox)
 
                     // Clear any overlays or results
                     var drawingCanvas = Quagga.canvas && Quagga.canvas.dom && Quagga.canvas.dom.overlay;
@@ -246,6 +254,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 self.checkCapabilities();
                 Quagga.onProcessed(self.onProcessed);
                 Quagga.onDetected(self.onDetected);
+
+                // Ensure the bounding box is present
+                var interactive = document.querySelector('#interactive');
+                var boundingBox = document.querySelector('#boundingBox');
+                if (!boundingBox) {
+                    // If bounding box is missing, create and append it
+                    boundingBox = document.createElement('div');
+                    boundingBox.id = 'boundingBox';
+                    interactive.appendChild(boundingBox);
+                }
             });
         },
         onProcessed: function (result) {
