@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', function () {
         checkCapabilities: function () {
             var track = Quagga.CameraAccess.getActiveTrack();
             var capabilities = {};
-            if (typeof track?.getCapabilities === "function") {
+            if (track && typeof track.getCapabilities === "function") {
                 capabilities = track.getCapabilities();
             }
             this.applySettingsVisibility("zoom", capabilities.zoom);
@@ -161,7 +161,7 @@ document.addEventListener('DOMContentLoaded', function () {
             var needsRestart = false;
 
             // Determine if the change requires a restart
-            if (path.startsWith('inputStream') || path.startsWith('decoder')) {
+            if (path.startsWith('inputStream') || path.startsWith('decoder') || path.startsWith('locator')) {
                 needsRestart = true;
             }
 
@@ -181,10 +181,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     self.disableControls(false);
                 }
             } else {
-                // Apply settings without restarting
-                if (path.startsWith('locator')) {
-                    Quagga.setLocatorSettings(self.state.locator);
-                }
                 // Re-enable controls
                 self.disableControls(false);
             }
@@ -384,7 +380,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     return value;
                 },
                 halfSample: function (value) {
-                    return value === 'true' || value === true;
+                    return (value === 'true' || value === true);
                 },
             },
         },
