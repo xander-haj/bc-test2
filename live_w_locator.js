@@ -1,4 +1,4 @@
-$(function () {
+document.addEventListener('DOMContentLoaded', function () {
     var resultCollector = Quagga.ResultCollector.create({
         capture: true,
         capacity: 20,
@@ -10,16 +10,8 @@ $(function () {
 
     var App = {
         init: function () {
-            var self = this;
-            Quagga.init(self.state, function (err) {
-                if (err) {
-                    return self.handleError(err);
-                }
-                App.attachListeners();
-                App.checkCapabilities();
-                Quagga.start();
-                self.initCameraSelection();
-            });
+            // We no longer initialize Quagga here
+            this.attachListeners();
         },
         handleError: function (err) {
             console.error(err);
@@ -85,10 +77,14 @@ $(function () {
         attachListeners: function () {
             var self = this;
 
+            document.querySelector(".controls button.start").addEventListener("click", function (e) {
+                e.preventDefault();
+                self.startScanner();
+            });
+
             document.querySelector(".controls button.stop").addEventListener("click", function (e) {
                 e.preventDefault();
-                Quagga.stop();
-                self._printCollectedResults();
+                self.stopScanner();
             });
 
             document.querySelector(".controls .reader-config-group").addEventListener(
@@ -103,7 +99,7 @@ $(function () {
                         name = target.name,
                         state = self._convertNameToState(name);
 
-                    if (name === "inputStream_constraints_device") {
+                    if (name === "inputStream_constraints_deviceId") {
                         // Handle camera device selection
                         self.setState("inputStream.constraints.deviceId", value);
                     } else if (name.startsWith("settings_")) {
@@ -120,6 +116,7 @@ $(function () {
             return name.replace(/_/g, ".").replace(/-/g, "");
         },
         detachListeners: function () {
+            document.querySelector(".controls button.start").removeEventListener("click");
             document.querySelector(".controls button.stop").removeEventListener("click");
             document.querySelector(".controls .reader-config-group").removeEventListener("change");
         },
@@ -144,9 +141,12 @@ $(function () {
             }
             var lastPart = parts.shift();
             target[lastPart] = value;
-            self.detachListeners();
-            Quagga.stop();
-            self.init();
+
+            // If Quagga is running, we need to restart it with the new configuration
+            if (Quagga.initialized) {
+                self.stopScanner();
+                self.startScanner();
+            }
         },
         inputMapper: {
             inputStream: {
@@ -160,7 +160,7 @@ $(function () {
                     }
                     return {};
                 },
-                constraints_device: function (value) {
+                constraints_deviceId: function (value) {
                     return {
                         deviceId: value,
                     };
@@ -220,65 +220,112 @@ $(function () {
             locate: true,
         },
         lastResult: null,
+        startScanner: function () {
+            var self = this;
+            if (Quagga.initialized) {
+                // Quagga is already initialized and running
+                return;
+            }
+            Quagga.init(self.state, function (err) {
+                if (err) {
+                    self.handleError(err);
+                    return;
+                }
+                Quagga.start();
+                self.initCameraSelection();
+                self.checkCapabilities();
+                Quagga.onProcessed(self.onProcessed);
+                Quagga.onDetected(self.onDetected);
+            });
+        },
+        stopScanner: function () {
+            var self = this;
+            if (Quagga.initialized) {
+                Quagga.stop();
+                Quagga.offProcessed(self.onProcessed);
+                Quagga.offDetected(self.onDetected);
+                Quagga.initialized = false;
+                self._printCollectedResults();
+            }
+        },
+        onProcessed: function (result) {
+            var drawingCtx = Quagga.canvas.ctx.overlay,
+                drawingCanvas = Quagga.canvas.dom.overlay;
+
+            if (result) {
+                if (result.boxes) {
+                    drawingCtx.clearRect(
+                        0,
+                        0,
+                        parseInt(drawingCanvas.getAttribute("width")),
+                        parseInt(drawingCanvas.getAttribute("height"))
+                    );
+                    result.boxes
+                        .filter(function (box) {
+                            return box !== result.box;
+                        })
+                        .forEach(function (box) {
+                            Quagga.ImageDebug.drawPath(box, { x: 0, y: 1 }, drawingCtx, {
+                                color: "green",
+                                lineWidth: 2,
+                            });
+                        });
+                }
+
+                if (result.box) {
+                    Quagga.ImageDebug.drawPath(result.box, { x: 0, y: 1 }, drawingCtx, {
+                        color: "#00F",
+                        lineWidth: 2,
+                    });
+                }
+
+                if (result.codeResult && result.codeResult.code) {
+                    Quagga.ImageDebug.drawPath(result.line, { x: "x", y: "y" }, drawingCtx, {
+                        color: "red",
+                        lineWidth: 3,
+                    });
+                }
+            }
+        },
+        onDetected: function (result) {
+            var code = result.codeResult.code;
+
+            if (App.lastResult !== code) {
+                App.lastResult = code;
+                var node = document.createElement("li");
+                var canvas = Quagga.canvas.dom.image;
+
+                node.innerHTML =
+                    '<div class="thumbnail"><div class="imgWrapper"><img src="' +
+                    canvas.toDataURL() +
+                    '"/></div><div class="caption"><h4 class="code">' +
+                    code +
+                    "</h4></div></div>";
+                document.querySelector("#result_strip ul.thumbnails").prepend(node);
+            }
+        },
+        _printCollectedResults: function () {
+            var results = resultCollector.getResults(),
+                ul = document.querySelector("#result_strip ul.collector");
+            if (!ul) {
+                ul = document.createElement('ul');
+                ul.className = 'collector';
+                document.getElementById('result_strip').appendChild(ul);
+            }
+            results.forEach(function (result) {
+                var li = document.createElement("li");
+                li.innerHTML =
+                    '<div class="thumbnail"><div class="imgWrapper"><img src="' +
+                    result.frame +
+                    '"/></div><div class="caption"><h4 class="code">' +
+                    result.codeResult.code +
+                    " (" +
+                    result.codeResult.format +
+                    ")</h4></div></div>";
+                ul.prepend(li);
+            });
+        },
     };
 
     App.init();
-
-    Quagga.onProcessed(function (result) {
-        var drawingCtx = Quagga.canvas.ctx.overlay,
-            drawingCanvas = Quagga.canvas.dom.overlay;
-
-        if (result) {
-            if (result.boxes) {
-                drawingCtx.clearRect(
-                    0,
-                    0,
-                    parseInt(drawingCanvas.getAttribute("width")),
-                    parseInt(drawingCanvas.getAttribute("height"))
-                );
-                result.boxes
-                    .filter(function (box) {
-                        return box !== result.box;
-                    })
-                    .forEach(function (box) {
-                        Quagga.ImageDebug.drawPath(box, { x: 0, y: 1 }, drawingCtx, {
-                            color: "green",
-                            lineWidth: 2,
-                        });
-                    });
-            }
-
-            if (result.box) {
-                Quagga.ImageDebug.drawPath(result.box, { x: 0, y: 1 }, drawingCtx, {
-                    color: "#00F",
-                    lineWidth: 2,
-                });
-            }
-
-            if (result.codeResult && result.codeResult.code) {
-                Quagga.ImageDebug.drawPath(result.line, { x: "x", y: "y" }, drawingCtx, {
-                    color: "red",
-                    lineWidth: 3,
-                });
-            }
-        }
-    });
-
-    Quagga.onDetected(function (result) {
-        var code = result.codeResult.code;
-
-        if (App.lastResult !== code) {
-            App.lastResult = code;
-            var node = document.createElement("li");
-            var canvas = Quagga.canvas.dom.image;
-
-            node.innerHTML =
-                '<div class="thumbnail"><div class="imgWrapper"><img src="' +
-                canvas.toDataURL() +
-                '"/></div><div class="caption"><h4 class="code">' +
-                code +
-                "</h4></div></div>";
-            document.querySelector("#result_strip ul.thumbnails").prepend(node);
-        }
-    });
 });
