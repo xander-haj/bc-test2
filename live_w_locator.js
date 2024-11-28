@@ -114,15 +114,6 @@ document.addEventListener('DOMContentLoaded', function () {
         _convertNameToState: function (name) {
             return name.replace(/_/g, ".").replace(/-/g, "");
         },
-        detachListeners: function () {
-            var startButton = document.querySelector(".controls button.start");
-            var stopButton = document.querySelector(".controls button.stop");
-            var configGroup = document.querySelector(".controls .reader-config-group");
-
-            if (startButton) startButton.removeEventListener("click", this.startScanner);
-            if (stopButton) stopButton.removeEventListener("click", this.stopScanner);
-            if (configGroup) configGroup.removeEventListener("change", this.setState);
-        },
         applySetting: function (setting, value) {
             var track = Quagga.CameraAccess.getActiveTrack();
             if (track && typeof track.getCapabilities === "function") {
@@ -135,11 +126,10 @@ document.addEventListener('DOMContentLoaded', function () {
             var self = this;
             self.disableControls(true);
 
-            var mapping = self.inputMapper;
             var pathParts = path.split('.');
             var target = self.state;
+            var mapping = self.inputMapper;
 
-            // Apply input mapping and update the state
             for (var i = 0; i < pathParts.length - 1; i++) {
                 var part = pathParts[i];
                 if (!target[part]) {
@@ -345,7 +335,8 @@ document.addEventListener('DOMContentLoaded', function () {
                         return { height: { min: parseInt(value) } };
                     },
                     deviceId: function (value) {
-                        return { deviceId: value };
+                        // Return the value directly
+                        return value;
                     },
                 },
             },
