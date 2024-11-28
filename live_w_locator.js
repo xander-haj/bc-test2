@@ -134,16 +134,19 @@ document.addEventListener('DOMContentLoaded', function () {
         setState: async function (path, value) {
             var self = this;
             self.disableControls(true);
-            var parts = path.split('.');
+
+            var keys = path.split('.');
             var target = self.state;
-            while (parts.length > 1) {
-                var part = parts.shift();
-                if (typeof target[part] !== 'object') {
-                    target[part] = {};
+            var lastKey = keys.pop();
+
+            // Navigate to the correct target in the state object
+            keys.forEach(function (key) {
+                if (typeof target[key] !== 'object') {
+                    target[key] = {};
                 }
-                target = target[part];
-            }
-            var lastPart = parts.shift();
+                target = target[key];
+            });
+
             var needsRestart = false;
 
             // Determine if the change requires a restart
@@ -151,7 +154,16 @@ document.addEventListener('DOMContentLoaded', function () {
                 needsRestart = true;
             }
 
-            target[lastPart] = value;
+            // Merge new value with existing value for constraints to preserve other properties
+            if (path.startsWith('inputStream.constraints')) {
+                // Merge constraints
+                target.constraints = {
+                    ...target.constraints,
+                    [lastKey]: value
+                };
+            } else {
+                target[lastKey] = value;
+            }
 
             if (needsRestart) {
                 if (Quagga.initialized) {
