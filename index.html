@@ -63,17 +63,31 @@
               <option value="code_93">Code 93</option>
             </select>
           </label>
+
+          <!-- Updated Resolution Inputs -->
           <label>
-            <span>Resolution (long side)</span>
-            <select name="inputStream_constraints">
-              <option value="320x240">320px</option>
-              <option selected="selected" value="640x480">640px</option>
-              <option value="800x600">800px</option>
-              <option value="1280x720">1280px</option>
-              <option value="1600x960">1600px</option>
-              <option value="1920x1080">1920px</option>
+            <span>Resolution Width (px)</span>
+            <select name="inputStream_constraints_width">
+              <option value="320">320px</option>
+              <option selected="selected" value="640">640px</option>
+              <option value="800">800px</option>
+              <option value="1280">1280px</option>
+              <option value="1600">1600px</option>
+              <option value="1920">1920px</option>
             </select>
           </label>
+          <label>
+            <span>Resolution Height (px)</span>
+            <select name="inputStream_constraints_height">
+              <option value="240">240px</option>
+              <option selected="selected" value="480">480px</option>
+              <option value="600">600px</option>
+              <option value="720">720px</option>
+              <option value="960">960px</option>
+              <option value="1080">1080px</option>
+            </select>
+          </label>
+
           <label>
             <span>Patch-Size</span>
             <select name="locator_patchSize">
