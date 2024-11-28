@@ -115,9 +115,13 @@ document.addEventListener('DOMContentLoaded', function () {
             return name.replace(/_/g, ".").replace(/-/g, "");
         },
         detachListeners: function () {
-            document.querySelector(".controls button.start").removeEventListener("click");
-            document.querySelector(".controls button.stop").removeEventListener("click");
-            document.querySelector(".controls .reader-config-group").removeEventListener("change");
+            var startButton = document.querySelector(".controls button.start");
+            var stopButton = document.querySelector(".controls button.stop");
+            var configGroup = document.querySelector(".controls .reader-config-group");
+
+            if (startButton) startButton.removeEventListener("click", this.startScanner);
+            if (stopButton) stopButton.removeEventListener("click", this.stopScanner);
+            if (configGroup) configGroup.removeEventListener("change", this.setState);
         },
         applySetting: function (setting, value) {
             var track = Quagga.CameraAccess.getActiveTrack();
@@ -127,8 +131,9 @@ document.addEventListener('DOMContentLoaded', function () {
                 track.applyConstraints({ advanced: [constraints] });
             }
         },
-        setState: function (path, value) {
+        setState: async function (path, value) {
             var self = this;
+            self.disableControls(true);
             var parts = path.split('.');
             var target = self.state;
             while (parts.length > 1) {
@@ -139,90 +144,80 @@ document.addEventListener('DOMContentLoaded', function () {
                 target = target[part];
             }
             var lastPart = parts.shift();
+            var needsRestart = false;
+
+            // Determine if the change requires a restart
+            if (path.startsWith('inputStream.constraints.deviceId') || path.startsWith('decoder.readers')) {
+                needsRestart = true;
+            }
+
             target[lastPart] = value;
 
-            // If Quagga is running, we need to stop it and wait before restarting
-            if (Quagga.initialized) {
-                self.stopScanner().then(function () {
+            if (needsRestart) {
+                if (Quagga.initialized) {
+                    try {
+                        await self.stopScanner();
+                        self.startScanner();
+                    } catch (error) {
+                        console.error("Error restarting scanner:", error);
+                        self.handleError(error);
+                    } finally {
+                        self.disableControls(false);
+                    }
+                } else {
                     self.startScanner();
-                }).catch(function (error) {
-                    console.error("Error restarting scanner:", error);
-                    self.handleError(error);
-                });
+                    self.disableControls(false);
+                }
+            } else {
+                // Apply settings without restarting
+                if (path.startsWith('locator')) {
+                    Quagga.setLocatorSettings(self.state.locator);
+                }
+                // Re-enable controls
+                self.disableControls(false);
             }
         },
-        inputMapper: {
-            inputStream: {
-                constraints: function (value) {
-                    if (/^(\d+)x(\d+)$/.test(value)) {
-                        var values = value.split("x");
-                        return {
-                            width: { min: parseInt(values[0]) },
-                            height: { min: parseInt(values[1]) },
-                        };
-                    }
-                    return {};
-                },
-                constraints_deviceId: function (value) {
-                    return {
-                        deviceId: value,
-                    };
-                },
-            },
-            numOfWorkers: function (value) {
-                return parseInt(value);
-            },
-            decoder: {
-                readers: function (value) {
-                    if (value === "ean_extended") {
-                        return [
-                            {
-                                format: "ean_reader",
-                                config: {
-                                    supplements: ["ean_5_reader", "ean_2_reader"],
-                                },
-                            },
-                        ];
-                    }
-                    return [
-                        {
-                            format: value + "_reader",
-                            config: {},
-                        },
-                    ];
-                },
-            },
-            locator: {
-                patchSize: function (value) {
-                    return value;
-                },
-                halfSample: function (value) {
-                    return value;
-                },
-            },
+        disableControls: function (disable) {
+            var controls = document.querySelectorAll('.controls .reader-config-group input, .controls .reader-config-group select, .controls button');
+            controls.forEach(function (control) {
+                control.disabled = disable;
+            });
+            // Display a loading indicator
+            var loadingIndicator = document.getElementById('loadingIndicator');
+            if (loadingIndicator) {
+                loadingIndicator.style.display = disable ? 'block' : 'none';
+            }
         },
-        state: {
-            inputStream: {
-                type: "LiveStream",
-                constraints: {
-                    width: { min: 640 },
-                    height: { min: 480 },
-                    facingMode: "environment",
-                    aspectRatio: { min: 1, max: 2 },
-                },
-                target: document.querySelector("#interactive"),
-            },
-            locator: {
-                patchSize: "medium",
-                halfSample: true,
-            },
-            numOfWorkers: 4,
-            decoder: {
-                readers: [{ format: "code_128_reader", config: {} }],
-            },
-            locate: true,
+        stopScanner: async function () {
+            var self = this;
+            if (Quagga.initialized) {
+                try {
+                    Quagga.stop(); // Stops the scanner and video processing
+                    await Quagga.CameraAccess.release(); // Waits for the camera to be released
+                    Quagga.offProcessed(self.onProcessed); // Removes the processed event listener
+                    Quagga.offDetected(self.onDetected); // Removes the detected event listener
+                    Quagga.initialized = false; // Sets the initialized flag to false
+
+                    // Remove the video element from the DOM
+                    var interactive = document.querySelector('#interactive');
+                    while (interactive.firstChild) {
+                        interactive.removeChild(interactive.firstChild);
+                    }
+
+                    // Clear any overlays or results
+                    var drawingCanvas = Quagga.canvas && Quagga.canvas.dom && Quagga.canvas.dom.overlay;
+                    if (drawingCanvas) {
+                        var drawingCtx = Quagga.canvas.ctx.overlay;
+                        drawingCtx.clearRect(0, 0, drawingCanvas.getAttribute("width"), drawingCanvas.getAttribute("height"));
+                    }
+
+                    self._printCollectedResults(); // If you want to display collected results
+                } catch (error) {
+                    console.error("Error releasing camera:", error);
+                    throw error;
+                }
+            }
         },
-        lastResult: null,
         startScanner: function () {
             var self = this;
             if (Quagga.initialized) {
@@ -241,40 +236,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 Quagga.onProcessed(self.onProcessed);
                 Quagga.onDetected(self.onDetected);
             });
-        },
-        stopScanner: function () {
-            var self = this;
-            if (Quagga.initialized) {
-                return new Promise(function (resolve, reject) {
-                    Quagga.stop(); // Stops the scanner and video processing
-                    Quagga.CameraAccess.release().then(function () {
-                        Quagga.offProcessed(self.onProcessed); // Removes the processed event listener
-                        Quagga.offDetected(self.onDetected); // Removes the detected event listener
-                        Quagga.initialized = false; // Sets the initialized flag to false
-
-                        // Remove the video element from the DOM
-                        var interactive = document.querySelector('#interactive');
-                        while (interactive.firstChild) {
-                            interactive.removeChild(interactive.firstChild);
-                        }
-
-                        // Clear any overlays or results
-                        var drawingCanvas = Quagga.canvas && Quagga.canvas.dom && Quagga.canvas.dom.overlay;
-                        if (drawingCanvas) {
-                            var drawingCtx = Quagga.canvas.ctx.overlay;
-                            drawingCtx.clearRect(0, 0, drawingCanvas.getAttribute("width"), drawingCanvas.getAttribute("height"));
-                        }
-
-                        self._printCollectedResults(); // If you want to display collected results
-                        resolve(); // Resolve the promise after everything is done
-                    }).catch(function (error) {
-                        console.error("Error releasing camera:", error);
-                        reject(error);
-                    });
-                });
-            } else {
-                return Promise.resolve();
-            }
         },
         onProcessed: function (result) {
             var drawingCtx = Quagga.canvas.ctx.overlay,
@@ -353,6 +314,78 @@ document.addEventListener('DOMContentLoaded', function () {
                 ul.prepend(li);
             });
         },
+        inputMapper: {
+            inputStream: {
+                constraints: function (value) {
+                    if (/^(\d+)x(\d+)$/.test(value)) {
+                        var values = value.split("x");
+                        return {
+                            width: { min: parseInt(values[0]) },
+                            height: { min: parseInt(values[1]) },
+                        };
+                    }
+                    return {};
+                },
+                constraints_deviceId: function (value) {
+                    return {
+                        deviceId: value,
+                    };
+                },
+            },
+            numOfWorkers: function (value) {
+                return parseInt(value);
+            },
+            decoder: {
+                readers: function (value) {
+                    if (value === "ean_extended") {
+                        return [
+                            {
+                                format: "ean_reader",
+                                config: {
+                                    supplements: ["ean_5_reader", "ean_2_reader"],
+                                },
+                            },
+                        ];
+                    }
+                    return [
+                        {
+                            format: value + "_reader",
+                            config: {},
+                        },
+                    ];
+                },
+            },
+            locator: {
+                patchSize: function (value) {
+                    return value;
+                },
+                halfSample: function (value) {
+                    return value;
+                },
+            },
+        },
+        state: {
+            inputStream: {
+                type: "LiveStream",
+                constraints: {
+                    width: { min: 640 },
+                    height: { min: 480 },
+                    facingMode: "environment",
+                    aspectRatio: { min: 1, max: 2 },
+                },
+                target: document.querySelector("#interactive"),
+            },
+            locator: {
+                patchSize: "medium",
+                halfSample: true,
+            },
+            numOfWorkers: 4,
+            decoder: {
+                readers: [{ format: "code_128_reader", config: {} }],
+            },
+            locate: true,
+        },
+        lastResult: null,
     };
 
     App.init();
