@@ -122,72 +122,79 @@ document.addEventListener('DOMContentLoaded', function () {
                 track.applyConstraints({ advanced: [constraints] });
             }
         },
-        setState: async function (path, value) {
-            var self = this;
-            self.disableControls(true);
+       setState: async function (path, value) {
+    var self = this;
+    self.disableControls(true);
 
-            var pathParts = path.split('.');
-            var target = self.state;
-            var mapping = self.inputMapper;
+    var pathParts = path.split('.');
+    var target = self.state;
+    var mapping = self.inputMapper;
 
-            for (var i = 0; i < pathParts.length - 1; i++) {
-                var part = pathParts[i];
-                if (!target[part]) {
-                    target[part] = {};
-                }
-                target = target[part];
-                if (mapping && mapping.hasOwnProperty(part)) {
-                    mapping = mapping[part];
-                } else {
-                    mapping = null;
-                }
-            }
+    for (var i = 0; i < pathParts.length - 1; i++) {
+        var part = pathParts[i];
+        if (!target[part]) {
+            target[part] = {};
+        }
+        target = target[part];
+        if (mapping && mapping.hasOwnProperty(part)) {
+            mapping = mapping[part];
+        } else {
+            mapping = null;
+        }
+    }
 
-            var lastPart = pathParts[pathParts.length - 1];
-            var mappedValue = value;
+    var lastPart = pathParts[pathParts.length - 1];
+    var mappedValue = value;
 
-            if (mapping && mapping.hasOwnProperty(lastPart)) {
-                mappedValue = mapping[lastPart](value);
-            }
+    if (mapping && mapping.hasOwnProperty(lastPart)) {
+        mappedValue = mapping[lastPart](value);
+    }
 
-            // Preserve existing properties
-            if (typeof mappedValue === 'object' && !Array.isArray(mappedValue)) {
-                target[lastPart] = Object.assign({}, target[lastPart], mappedValue);
-            } else {
-                target[lastPart] = mappedValue;
-            }
+    // Preserve existing properties
+    if (typeof mappedValue === 'object' && !Array.isArray(mappedValue)) {
+        target[lastPart] = Object.assign({}, target[lastPart], mappedValue);
+    } else {
+        target[lastPart] = mappedValue;
+    }
 
-            var needsRestart = false;
+    var needsRestart = false;
 
-            // Determine if the change requires a restart
-            if (path.startsWith('inputStream') || path.startsWith('decoder')) {
-                needsRestart = true;
-            }
+    // Determine if the change requires a restart
+    if (path.startsWith('inputStream') || path.startsWith('decoder')) {
+        needsRestart = true;
+    }
 
-            if (needsRestart) {
-                if (Quagga.initialized) {
-                    try {
-                        await self.stopScanner();
-                        self.startScanner();
-                    } catch (error) {
-                        console.error("Error restarting scanner:", error);
-                        self.handleError(error);
-                    } finally {
-                        self.disableControls(false);
-                    }
-                } else {
-                    self.startScanner();
-                    self.disableControls(false);
-                }
-            } else {
-                // Apply settings without restarting
-                if (path.startsWith('locator')) {
-                    Quagga.setLocatorSettings(self.state.locator);
-                }
-                // Re-enable controls
+    if (needsRestart) {
+        if (Quagga.initialized) {
+            try {
+                await self.stopScanner();
+                await self.startScanner();
+            } catch (error) {
+                console.error("Error restarting scanner:", error);
+                self.handleError(error);
+            } finally {
                 self.disableControls(false);
             }
-        },
+        } else {
+            try {
+                await self.startScanner();
+            } catch (error) {
+                console.error("Error starting scanner:", error);
+                self.handleError(error);
+            } finally {
+                self.disableControls(false);
+            }
+        }
+    } else {
+        // Apply settings without restarting
+        if (path.startsWith('locator')) {
+            Quagga.setLocatorSettings(self.state.locator);
+        }
+        // Re-enable controls
+        self.disableControls(false);
+    }
+},
+
         disableControls: function (disable) {
             var controls = document.querySelectorAll('.controls .reader-config-group input, .controls .reader-config-group select, .controls button');
             controls.forEach(function (control) {
@@ -199,72 +206,87 @@ document.addEventListener('DOMContentLoaded', function () {
                 loadingIndicator.style.display = disable ? 'block' : 'none';
             }
         },
-        stopScanner: async function () {
-            var self = this;
-            if (Quagga.initialized) {
-                try {
-                    Quagga.stop(); // Stops the scanner and video processing
-                    await Quagga.CameraAccess.release(); // Waits for the camera to be released
-                    Quagga.offProcessed(self.onProcessed); // Removes the processed event listener
-                    Quagga.offDetected(self.onDetected); // Removes the detected event listener
-                    Quagga.initialized = false; // Sets the initialized flag to false
+        stopScanner: function () {
+    var self = this;
+    return new Promise(async function (resolve, reject) {
+        if (Quagga.initialized) {
+            try {
+                Quagga.stop(); // Stops the scanner and video processing
+                await Quagga.CameraAccess.release(); // Waits for the camera to be released
+                Quagga.offProcessed(self.onProcessed); // Removes the processed event listener
+                Quagga.offDetected(self.onDetected); // Removes the detected event listener
+                Quagga.initialized = false; // Sets the initialized flag to false
 
-                    // Remove Quagga's video and canvas elements from the DOM
-                    var interactive = document.querySelector('#interactive');
-                    var video = interactive.querySelector('video');
-                    if (video) {
-                        interactive.removeChild(video);
-                    }
-                    // Remove Quagga's canvas overlays
-                    var canvases = interactive.querySelectorAll('canvas');
-                    canvases.forEach(function (canvas) {
-                        interactive.removeChild(canvas);
-                    });
-
-                    // Do not remove other child nodes (like #boundingBox)
-
-                    // Clear any overlays or results
-                    var drawingCanvas = Quagga.canvas && Quagga.canvas.dom && Quagga.canvas.dom.overlay;
-                    if (drawingCanvas) {
-                        var drawingCtx = Quagga.canvas.ctx.overlay;
-                        drawingCtx.clearRect(0, 0, drawingCanvas.getAttribute("width"), drawingCanvas.getAttribute("height"));
-                    }
-
-                    self._printCollectedResults(); // If you want to display collected results
-                } catch (error) {
-                    console.error("Error releasing camera:", error);
-                    throw error;
+                // Remove Quagga's video and canvas elements from the DOM
+                var interactive = document.querySelector('#interactive');
+                var video = interactive.querySelector('video');
+                if (video) {
+                    interactive.removeChild(video);
                 }
+                // Remove Quagga's canvas overlays
+                var canvases = interactive.querySelectorAll('canvas');
+                canvases.forEach(function (canvas) {
+                    interactive.removeChild(canvas);
+                });
+
+                // Do not remove other child nodes (like #boundingBox)
+
+                // Clear any overlays or results
+                var drawingCanvas = Quagga.canvas && Quagga.canvas.dom && Quagga.canvas.dom.overlay;
+                if (drawingCanvas) {
+                    var drawingCtx = Quagga.canvas.ctx.overlay;
+                    drawingCtx.clearRect(0, 0, drawingCanvas.getAttribute("width"), drawingCanvas.getAttribute("height"));
+                }
+
+                self._printCollectedResults(); // If you want to display collected results
+
+                resolve();
+            } catch (error) {
+                console.error("Error releasing camera:", error);
+                reject(error);
             }
-        },
-        startScanner: function () {
-            var self = this;
-            if (Quagga.initialized) {
-                // Quagga is already initialized and running
+        } else {
+            resolve();
+        }
+    });
+},
+
+       startScanner: function () {
+    var self = this;
+    return new Promise(function (resolve, reject) {
+        if (Quagga.initialized) {
+            // Quagga is already initialized and running
+            resolve();
+            return;
+        }
+        Quagga.init(self.state, function (err) {
+            if (err) {
+                self.handleError(err);
+                reject(err);
                 return;
             }
-            Quagga.init(self.state, function (err) {
-                if (err) {
-                    self.handleError(err);
-                    return;
-                }
-                Quagga.start();
-                Quagga.initialized = true; // Set initialized to true
-                self.initCameraSelection();
-                self.checkCapabilities();
-                Quagga.onProcessed(self.onProcessed);
-                Quagga.onDetected(self.onDetected);
+            Quagga.start();
+            Quagga.initialized = true; // Set initialized to true
+            self.initCameraSelection();
+            self.checkCapabilities();
+            Quagga.onProcessed(self.onProcessed);
+            Quagga.onDetected(self.onDetected);
 
-                // Ensure the bounding box is present
-                var interactive = document.querySelector('#interactive');
-                var boundingBox = document.querySelector('#boundingBox');
-                if (!boundingBox) {
-                    // If bounding box is missing, create and append it
-                    boundingBox = document.createElement('div');
-                    boundingBox.id = 'boundingBox';
-                    interactive.appendChild(boundingBox);
-                }
-            });
+            // Ensure the bounding box is present
+            var interactive = document.querySelector('#interactive');
+            var boundingBox = document.querySelector('#boundingBox');
+            if (!boundingBox) {
+                // If bounding box is missing, create and append it
+                boundingBox = document.createElement('div');
+                boundingBox.id = 'boundingBox';
+                interactive.appendChild(boundingBox);
+            }
+
+            resolve();
+        });
+    });
+},
+
         },
         onProcessed: function (result) {
             var drawingCtx = Quagga.canvas.ctx.overlay,
