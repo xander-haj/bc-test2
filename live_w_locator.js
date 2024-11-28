@@ -110,6 +110,9 @@ document.addEventListener('DOMContentLoaded', function () {
                         // Handle settings like zoom and torch
                         var setting = name.substring(9); // Remove 'settings_' prefix
                         self.applySetting(setting, value);
+                    } else if (name === "inputStream_constraints_width" || name === "inputStream_constraints_height") {
+                        // Handle resolution changes
+                        self.setState(name, value);
                     } else {
                         self.setState(state, value);
                     }
@@ -455,7 +458,7 @@ document.addEventListener('DOMContentLoaded', function () {
             numOfWorkers: 4,
             decoder: {
                 readers: [
-                    { format: "code_128_reader", config: {} },
+                    { format: "code_128_reader", config: {} }, 
                     { format: "upc_reader", config: {} },
                     { format: "upc_e_reader", config: {} },
                 ],
