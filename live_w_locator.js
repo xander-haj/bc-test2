@@ -11,7 +11,7 @@ document.addEventListener('DOMContentLoaded', function () {
     var App = {
         init: function () {
             this.lastResult = null;
-            this.scannerRunning = false; // Track if the scanner is running
+            this.scannerRunning = false;
             this.attachListeners();
             this.initCameraSelection();
         },
@@ -148,7 +148,13 @@ document.addEventListener('DOMContentLoaded', function () {
             var mappedValue = value;
 
             if (mapping && mapping.hasOwnProperty(lastPart)) {
-                mappedValue = mapping[lastPart](value);
+                if (typeof mapping[lastPart] === 'function') {
+                    mappedValue = mapping[lastPart](value);
+                } else {
+                    mappedValue = mapping[lastPart];
+                }
+            } else {
+                mappedValue = value;
             }
 
             // Preserve existing properties
@@ -341,13 +347,12 @@ document.addEventListener('DOMContentLoaded', function () {
             inputStream: {
                 constraints: {
                     width: function (value) {
-                        return { width: { min: parseInt(value) } };
+                        return { min: parseInt(value) };
                     },
                     height: function (value) {
-                        return { height: { min: parseInt(value) } };
+                        return { min: parseInt(value) };
                     },
                     deviceId: function (value) {
-                        // Return the value directly
                         return value;
                     },
                 },
