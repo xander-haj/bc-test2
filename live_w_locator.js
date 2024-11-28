@@ -165,25 +165,14 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             if (needsRestart) {
-                if (Quagga.initialized) {
-                    try {
-                        await self.stopScanner();
-                        await self.startScanner();
-                    } catch (error) {
-                        console.error("Error restarting scanner:", error);
-                        self.handleError(error);
-                    } finally {
-                        self.disableControls(false);
-                    }
-                } else {
-                    try {
-                        await self.startScanner();
-                    } catch (error) {
-                        console.error("Error starting scanner:", error);
-                        self.handleError(error);
-                    } finally {
-                        self.disableControls(false);
-                    }
+                try {
+                    await self.stopScanner();
+                    await self.startScanner();
+                } catch (error) {
+                    console.error("Error restarting scanner:", error);
+                    self.handleError(error);
+                } finally {
+                    self.disableControls(false);
                 }
             } else {
                 // Apply settings without restarting
@@ -205,51 +194,46 @@ document.addEventListener('DOMContentLoaded', function () {
                 loadingIndicator.style.display = disable ? 'block' : 'none';
             }
         },
-        stopScanner: function () {
+        stopScanner: async function () {
             var self = this;
-            return new Promise(async function (resolve, reject) {
-                if (Quagga.initialized) {
-                    try {
-                        Quagga.stop(); // Stops the scanner and video processing
-                        await Quagga.CameraAccess.release(); // Waits for the camera to be released
-                        Quagga.offProcessed(self.onProcessed); // Removes the processed event listener
-                        Quagga.offDetected(self.onDetected); // Removes the detected event listener
-                        Quagga.initialized = false; // Sets the initialized flag to false
+            if (Quagga.initialized) {
+                try {
+                    Quagga.stop(); // Stops the scanner and video processing
+                    await Quagga.CameraAccess.release(); // Waits for the camera to be released
+                    Quagga.offProcessed(self.onProcessed); // Removes the processed event listener
+                    Quagga.offDetected(self.onDetected); // Removes the detected event listener
+                    Quagga.initialized = false; // Sets the initialized flag to false
 
-                        // Remove Quagga's video and canvas elements from the DOM
-                        var interactive = document.querySelector('#interactive');
-                        var video = interactive.querySelector('video');
-                        if (video) {
-                            interactive.removeChild(video);
-                        }
-                        // Remove Quagga's canvas overlays
-                        var canvases = interactive.querySelectorAll('canvas');
-                        canvases.forEach(function (canvas) {
-                            interactive.removeChild(canvas);
-                        });
-
-                        // Do not remove other child nodes (like #boundingBox)
-
-                        // Clear any overlays or results
-                        var drawingCanvas = Quagga.canvas && Quagga.canvas.dom && Quagga.canvas.dom.overlay;
-                        if (drawingCanvas) {
-                            var drawingCtx = Quagga.canvas.ctx.overlay;
-                            drawingCtx.clearRect(0, 0, drawingCanvas.getAttribute("width"), drawingCanvas.getAttribute("height"));
-                        }
-
-                        self._printCollectedResults(); // If you want to display collected results
-
-                        resolve();
-                    } catch (error) {
-                        console.error("Error releasing camera:", error);
-                        reject(error);
+                    // Remove Quagga's video and canvas elements from the DOM
+                    var interactive = document.querySelector('#interactive');
+                    var video = interactive.querySelector('video');
+                    if (video) {
+                        interactive.removeChild(video);
                     }
-                } else {
-                    resolve();
+                    // Remove Quagga's canvas overlays
+                    var canvases = interactive.querySelectorAll('canvas');
+                    canvases.forEach(function (canvas) {
+                        interactive.removeChild(canvas);
+                    });
+
+                    // Do not remove other child nodes (like #boundingBox)
+
+                    // Clear any overlays or results
+                    var drawingCanvas = Quagga.canvas && Quagga.canvas.dom && Quagga.canvas.dom.overlay;
+                    if (drawingCanvas) {
+                        var drawingCtx = Quagga.canvas.ctx.overlay;
+                        drawingCtx.clearRect(0, 0, drawingCanvas.getAttribute("width"), drawingCanvas.getAttribute("height"));
+                    }
+
+                    self._printCollectedResults(); // If you want to display collected results
+
+                } catch (error) {
+                    console.error("Error releasing camera:", error);
+                    throw error;
                 }
-            });
+            }
         },
-        startScanner: function () {
+        startScanner: async function () {
             var self = this;
             return new Promise(function (resolve, reject) {
                 Quagga.init(self.state, function (err) {
@@ -262,8 +246,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     Quagga.initialized = true; // Set initialized to true
                     self.initCameraSelection();
                     self.checkCapabilities();
-                    Quagga.onProcessed(self.onProcessed);
-                    Quagga.onDetected(self.onDetected);
+                    Quagga.onProcessed(self.onProcessed.bind(self));
+                    Quagga.onDetected(self.onDetected.bind(self));
 
                     // Ensure the bounding box is present
                     var interactive = document.querySelector('#interactive');
