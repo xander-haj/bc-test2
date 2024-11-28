@@ -10,7 +10,9 @@ document.addEventListener('DOMContentLoaded', function () {
 
     var App = {
         init: function () {
+            this.lastResult = null;
             this.attachListeners();
+            this.initCameraSelection();
         },
         handleError: function (err) {
             console.error(err);
@@ -57,9 +59,8 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         },
         initCameraSelection: function () {
-            var streamLabel = Quagga.CameraAccess.getActiveStreamLabel();
-
-            return Quagga.CameraAccess.enumerateVideoDevices().then(function (devices) {
+            var self = this;
+            Quagga.CameraAccess.enumerateVideoDevices().then(function (devices) {
                 var deviceSelection = document.getElementById("deviceSelection");
                 while (deviceSelection.firstChild) {
                     deviceSelection.removeChild(deviceSelection.firstChild);
@@ -68,7 +69,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     var option = document.createElement("option");
                     option.value = device.deviceId || device.id;
                     option.text = device.label || device.deviceId || device.id;
-                    option.selected = streamLabel === device.label;
                     deviceSelection.appendChild(option);
                 });
             });
@@ -252,11 +252,6 @@ document.addEventListener('DOMContentLoaded', function () {
         startScanner: function () {
             var self = this;
             return new Promise(function (resolve, reject) {
-                if (Quagga.initialized) {
-                    // Quagga is already initialized and running
-                    resolve();
-                    return;
-                }
                 Quagga.init(self.state, function (err) {
                     if (err) {
                         self.handleError(err);
@@ -326,8 +321,8 @@ document.addEventListener('DOMContentLoaded', function () {
         onDetected: function (result) {
             var code = result.codeResult.code;
 
-            if (App.lastResult !== code) {
-                App.lastResult = code;
+            if (this.lastResult !== code) {
+                this.lastResult = code;
                 var node = document.createElement("li");
                 var canvas = Quagga.canvas.dom.image;
 
@@ -435,7 +430,6 @@ document.addEventListener('DOMContentLoaded', function () {
             },
             locate: true,
         },
-        lastResult: null,
     };
 
     App.init();
