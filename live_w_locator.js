@@ -1,21 +1,4 @@
 document.addEventListener('DOMContentLoaded', function () {
-    function mergeRecursive(obj1, obj2) {
-        for (var p in obj2) {
-            if (obj2.hasOwnProperty(p)) {
-                try {
-                    if (obj2[p].constructor === Object) {
-                        obj1[p] = mergeRecursive(obj1[p] || {}, obj2[p]);
-                    } else {
-                        obj1[p] = obj2[p];
-                    }
-                } catch (e) {
-                    obj1[p] = obj2[p];
-                }
-            }
-        }
-        return obj1;
-    }
-
     var resultCollector = Quagga.ResultCollector.create({
         capture: true,
         capacity: 20,
@@ -152,32 +135,37 @@ document.addEventListener('DOMContentLoaded', function () {
             var self = this;
             self.disableControls(true);
 
-            var mappedValue = value;
             var mapping = self.inputMapper;
             var pathParts = path.split('.');
+            var target = self.state;
 
-            // Apply input mapping
-            pathParts.forEach(function (part, index) {
+            // Apply input mapping and update the state
+            for (var i = 0; i < pathParts.length - 1; i++) {
+                var part = pathParts[i];
+                if (!target[part]) {
+                    target[part] = {};
+                }
+                target = target[part];
                 if (mapping && mapping.hasOwnProperty(part)) {
                     mapping = mapping[part];
-                    if (typeof mapping === 'function') {
-                        mappedValue = mapping(value);
-                    }
                 } else {
                     mapping = null;
                 }
-            });
-
-            // Deep merge the new value into the state
-            var newState = {};
-            var temp = newState;
-            for (var i = 0; i < pathParts.length - 1; i++) {
-                temp[pathParts[i]] = {};
-                temp = temp[pathParts[i]];
             }
-            temp[pathParts[pathParts.length - 1]] = mappedValue;
 
-            self.state = mergeRecursive(self.state, newState);
+            var lastPart = pathParts[pathParts.length - 1];
+            var mappedValue = value;
+
+            if (mapping && mapping.hasOwnProperty(lastPart)) {
+                mappedValue = mapping[lastPart](value);
+            }
+
+            // Preserve existing properties
+            if (typeof mappedValue === 'object' && !Array.isArray(mappedValue)) {
+                target[lastPart] = Object.assign({}, target[lastPart], mappedValue);
+            } else {
+                target[lastPart] = mappedValue;
+            }
 
             var needsRestart = false;
 
@@ -349,20 +337,16 @@ document.addEventListener('DOMContentLoaded', function () {
         },
         inputMapper: {
             inputStream: {
-                constraints: function (value) {
-                    if (/^(\d+)x(\d+)$/.test(value)) {
-                        var values = value.split("x");
-                        return {
-                            width: { min: parseInt(values[0]) },
-                            height: { min: parseInt(values[1]) },
-                        };
-                    }
-                    return {};
-                },
-                constraints_deviceId: function (value) {
-                    return {
-                        deviceId: value,
-                    };
+                constraints: {
+                    width: function (value) {
+                        return { width: { min: parseInt(value) } };
+                    },
+                    height: function (value) {
+                        return { height: { min: parseInt(value) } };
+                    },
+                    deviceId: function (value) {
+                        return { deviceId: value };
+                    },
                 },
             },
             numOfWorkers: function (value) {
