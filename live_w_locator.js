@@ -78,7 +78,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
             });
         },
-        
         attachListeners: function () {
             var self = this;
 
@@ -255,11 +254,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
                 Quagga.start();
                 self.scannerRunning = true;
-                self.initCameraSelection();
                 self.checkCapabilities();
                 Quagga.onProcessed(self.onProcessed.bind(self));
                 Quagga.onDetected(self.onDetected.bind(self));
-        
+
                 // Ensure the bounding box is present
                 var interactive = document.querySelector('#interactive');
                 var boundingBox = document.getElementById('boundingBox');
@@ -269,7 +267,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     boundingBox.id = 'boundingBox';
                     interactive.appendChild(boundingBox);
                 }
-        
+
                 // Create the code overlay
                 var codeOverlay = document.getElementById('codeOverlay');
                 if (!codeOverlay) {
@@ -334,16 +332,16 @@ document.addEventListener('DOMContentLoaded', function () {
         },
         onDetected: function (result) {
             var code = result.codeResult.code;
-        
+
             if (this.lastResult !== code) {
                 this.lastResult = code;
-        
+
                 // Update the code overlay
                 var codeOverlay = document.getElementById('codeOverlay');
                 if (codeOverlay) {
                     codeOverlay.textContent = code;
                 }
-        
+
                 // Optionally, clear the overlay after a delay
                 setTimeout(function () {
                     var overlay = document.getElementById('codeOverlay');
@@ -351,11 +349,11 @@ document.addEventListener('DOMContentLoaded', function () {
                         overlay.textContent = '';
                     }
                 }, 3000); // Adjust the delay as needed
-        
+
                 // Existing code to display the result in the result strip
                 var node = document.createElement("li");
                 var canvas = Quagga.canvas.dom.image;
-        
+
                 node.innerHTML =
                     '<div class="thumbnail"><div class="imgWrapper"><img src="' +
                     canvas.toDataURL() +
@@ -440,6 +438,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     height: { min: 480 },
                     facingMode: "environment",
                     aspectRatio: { min: 1, max: 2 },
+                    deviceId: null, // Ensure deviceId is included
                 },
                 area: { // defines rectangle of the detection/localization area
                     top: "35%",    // top offset
@@ -456,7 +455,7 @@ document.addEventListener('DOMContentLoaded', function () {
             numOfWorkers: 4,
             decoder: {
                 readers: [
-                    { format: "code_128_reader", config: {} }, 
+                    { format: "code_128_reader", config: {} },
                     { format: "upc_reader", config: {} },
                     { format: "upc_e_reader", config: {} },
                 ],
