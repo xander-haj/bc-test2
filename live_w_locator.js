@@ -373,6 +373,12 @@ document.addEventListener('DOMContentLoaded', function () {
                     facingMode: "environment",
                     aspectRatio: { min: 1, max: 2 },
                 },
+                area: { // defines rectangle of the detection/localization area
+                    top: "35%",    // top offset
+                    right: "20%",  // right offset
+                    left: "20%",   // left offset
+                    bottom: "35%"  // bottom offset
+                },
                 target: document.querySelector("#interactive"),
             },
             locator: {
