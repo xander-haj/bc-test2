@@ -16,6 +16,7 @@ document.addEventListener('DOMContentLoaded', function () {
         init: function () {
             this.lastResult = null;
             this.scannerRunning = false;
+            this.selectedDeviceId = null; // Add a property to keep track of the selected deviceId
             this.attachListeners();
             // Do not initialize camera selection on load to avoid permissions issues
         },
@@ -93,6 +94,11 @@ document.addEventListener('DOMContentLoaded', function () {
                     deviceSelection.appendChild(option);
                 });
                 deviceSelection.disabled = false;
+
+                // If no device is selected yet, set to the first device
+                if (!self.selectedDeviceId && devices.length > 0) {
+                    self.selectedDeviceId = devices[0].deviceId || devices[0].id;
+                }
             }).catch(function (err) {
                 console.error("Error enumerating video devices:", err);
                 alert("Error accessing camera devices. Please ensure you have granted camera permissions.");
@@ -125,6 +131,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     if (name === "inputStream_constraints_deviceId") {
                         // Handle camera device selection
+                        self.selectedDeviceId = value; // Update the selectedDeviceId
                         self.setState("inputStream.constraints.deviceId", value);
                     } else if (name.startsWith("settings_")) {
                         // Handle settings like zoom and torch
@@ -313,7 +320,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
 
                     // After Quagga has started and camera permissions are granted, enumerate devices
-                    self.initCameraSelection().then(function () {
+                    self.initCameraSelection(self.selectedDeviceId).then(function () { // Pass the selectedDeviceId
                         self.disableControls(false); // Re-enable controls after initialization
                     }).catch(function () {
                         self.disableControls(false); // Even if enumeration fails, re-enable controls
