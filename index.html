@@ -14,6 +14,9 @@
   <style>
     #interactive {
       position: relative;
+      width: 100%;
+      max-width: 800px;
+      margin: 0 auto; /* Center the interactive area */
     }
 
     #boundingBox {
@@ -92,12 +95,14 @@
 
     .controls {
       margin-bottom: 20px;
+      text-align: center; /* Center the controls */
     }
 
     .controls fieldset {
       border: 1px solid #ccc;
       padding: 10px;
       margin-bottom: 10px;
+      display: inline-block; /* Allow centering */
     }
 
     .controls label {
@@ -108,7 +113,8 @@
     /* Adjusting the layout for buttons */
     .controls .input-group {
       display: flex;
-      gap: 10px;
+      justify-content: center; /* Center the buttons */
+      gap: 20px; /* Increase spacing between buttons */
       margin-bottom: 10px;
     }
 
@@ -141,6 +147,11 @@
       .thumbnail img {
         max-width: 100px;
         max-height: 100px;
+      }
+
+      .controls .input-group {
+        flex-direction: column;
+        gap: 10px;
       }
     }
   </style>
