@@ -17,8 +17,7 @@ document.addEventListener('DOMContentLoaded', function () {
             this.lastResult = null;
             this.scannerRunning = false;
             this.attachListeners();
-            // Initialize camera selection on load
-            this.initCameraSelection();
+            // Do not initialize camera selection on load to avoid permissions issues
         },
         handleError: function (err) {
             console.error(err);
@@ -281,27 +280,6 @@ document.addEventListener('DOMContentLoaded', function () {
             self.disableControls(true); // Disable controls while initializing
 
             try {
-                // Enumerate video devices first
-                var devices = await Quagga.CameraAccess.enumerateVideoDevices();
-
-                if (devices.length === 0) {
-                    throw new Error("No video devices found.");
-                }
-
-                var deviceSelection = document.getElementById("deviceSelection");
-                var selectedDeviceId = deviceSelection.value;
-
-                // If no device is selected, default to the first device
-                if (!selectedDeviceId && devices.length > 0) {
-                    selectedDeviceId = devices[0].deviceId;
-                }
-
-                // Update state with selected deviceId
-                await self.setState("inputStream.constraints.deviceId", selectedDeviceId);
-
-                // Populate the dropdown with devices, selecting the active device
-                await self.initCameraSelection(selectedDeviceId);
-
                 // Initialize and start QuaggaJS
                 Quagga.init(self.state, function (err) {
                     if (err) {
@@ -334,7 +312,12 @@ document.addEventListener('DOMContentLoaded', function () {
                         interactive.appendChild(codeOverlay);
                     }
 
-                    self.disableControls(false); // Re-enable controls after initialization
+                    // After Quagga has started and camera permissions are granted, enumerate devices
+                    self.initCameraSelection().then(function () {
+                        self.disableControls(false); // Re-enable controls after initialization
+                    }).catch(function () {
+                        self.disableControls(false); // Even if enumeration fails, re-enable controls
+                    });
                 });
 
             } catch (error) {
