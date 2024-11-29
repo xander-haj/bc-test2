@@ -60,7 +60,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
         },
-        initCameraSelection: function (selectedDeviceId) { // Modified to accept selectedDeviceId
+        /**
+         * Initialize Camera Selection with Optional Selected Device ID
+         * @param {string} selectedDeviceId - The deviceId to be selected in the dropdown
+         */
+        initCameraSelection: function (selectedDeviceId) {
             var self = this;
             return Quagga.CameraAccess.enumerateVideoDevices().then(function (devices) {
                 var deviceSelection = document.getElementById("deviceSelection");
@@ -133,6 +137,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 track.applyConstraints({ advanced: [constraints] });
             }
         },
+        /**
+         * Set State Function
+         * @param {string} path - The state path to update
+         * @param {any} value - The value to set
+         */
         setState: async function (path, value) {
             var self = this;
             self.disableControls(true);
@@ -251,63 +260,89 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
             }
         },
+        /**
+         * Start Scanner Function
+         */
         startScanner: async function () {
             var self = this;
-            Quagga.init(self.state, function (err) {
-                if (err) {
-                    self.handleError(err);
-                    return;
-                }
-                Quagga.start();
-                self.scannerRunning = true;
-                self.checkCapabilities();
-                Quagga.onProcessed(self.onProcessed.bind(self));
-                Quagga.onDetected(self.onDetected.bind(self));
 
-                // Ensure the bounding box is present
-                var interactive = document.querySelector('#interactive');
-                var boundingBox = document.getElementById('boundingBox');
-                if (!boundingBox) {
-                    // If bounding box is missing, create and append it
-                    boundingBox = document.createElement('div');
-                    boundingBox.id = 'boundingBox';
-                    interactive.appendChild(boundingBox);
+            self.disableControls(true); // Disable controls while initializing
+
+            try {
+                // Enumerate video devices first
+                var devices = await Quagga.CameraAccess.enumerateVideoDevices();
+
+                if (devices.length === 0) {
+                    throw new Error("No video devices found.");
                 }
 
-                // Create the code overlay
-                var codeOverlay = document.getElementById('codeOverlay');
-                if (!codeOverlay) {
-                    codeOverlay = document.createElement('div');
-                    codeOverlay.id = 'codeOverlay';
-                    codeOverlay.style.position = 'absolute';
-                    codeOverlay.style.top = '35%'; // Match the ROI top offset
-                    codeOverlay.style.left = '20%'; // Match the ROI left offset
-                    codeOverlay.style.width = '60%'; // Width between left and right offsets
-                    codeOverlay.style.height = '30%'; // Height between top and bottom offsets
-                    codeOverlay.style.display = 'flex';
-                    codeOverlay.style.alignItems = 'center';
-                    codeOverlay.style.justifyContent = 'center';
-                    codeOverlay.style.color = '#FFFFFF';
-                    codeOverlay.style.fontSize = '24px';
-                    codeOverlay.style.fontWeight = 'bold';
-                    codeOverlay.style.textAlign = 'center';
-                    codeOverlay.style.pointerEvents = 'none';
-                    codeOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.5)'; // Optional background for readability
-                    interactive.appendChild(codeOverlay);
+                var deviceSelection = document.getElementById("deviceSelection");
+                var selectedDeviceId = deviceSelection.value;
+
+                // If no device is selected, default to the first device
+                if (!selectedDeviceId && devices.length > 0) {
+                    selectedDeviceId = devices[0].deviceId;
                 }
 
-                // **New Code: Enumerate devices and set the dropdown to the active device**
-                var activeTrack = Quagga.CameraAccess.getActiveTrack();
-                if (activeTrack) {
-                    var deviceId = activeTrack.getSettings().deviceId;
-                    self.initCameraSelection(deviceId).then(function () {
-                        // Dropdown is now updated with the correct device selected
-                    });
-                } else {
-                    // Fallback: Enumerate without selecting any device
-                    self.initCameraSelection();
-                }
-            });
+                // Update state with selected deviceId
+                await self.setState("inputStream.constraints.deviceId", selectedDeviceId);
+
+                // Populate the dropdown with devices, selecting the active device
+                await self.initCameraSelection(selectedDeviceId);
+
+                // Initialize and start QuaggaJS
+                Quagga.init(self.state, function (err) {
+                    if (err) {
+                        self.handleError(err);
+                        self.disableControls(false);
+                        return;
+                    }
+                    Quagga.start();
+                    self.scannerRunning = true;
+                    self.checkCapabilities();
+                    Quagga.onProcessed(self.onProcessed.bind(self));
+                    Quagga.onDetected(self.onDetected.bind(self));
+
+                    // Ensure the bounding box is present
+                    var interactive = document.querySelector('#interactive');
+                    var boundingBox = document.getElementById('boundingBox');
+                    if (!boundingBox) {
+                        // If bounding box is missing, create and append it
+                        boundingBox = document.createElement('div');
+                        boundingBox.id = 'boundingBox';
+                        interactive.appendChild(boundingBox);
+                    }
+
+                    // Create the code overlay
+                    var codeOverlay = document.getElementById('codeOverlay');
+                    if (!codeOverlay) {
+                        codeOverlay = document.createElement('div');
+                        codeOverlay.id = 'codeOverlay';
+                        codeOverlay.style.position = 'absolute';
+                        codeOverlay.style.top = '35%'; // Match the ROI top offset
+                        codeOverlay.style.left = '20%'; // Match the ROI left offset
+                        codeOverlay.style.width = '60%'; // Width between left and right offsets
+                        codeOverlay.style.height = '30%'; // Height between top and bottom offsets
+                        codeOverlay.style.display = 'flex';
+                        codeOverlay.style.alignItems = 'center';
+                        codeOverlay.style.justifyContent = 'center';
+                        codeOverlay.style.color = '#FFFFFF';
+                        codeOverlay.style.fontSize = '24px';
+                        codeOverlay.style.fontWeight = 'bold';
+                        codeOverlay.style.textAlign = 'center';
+                        codeOverlay.style.pointerEvents = 'none';
+                        codeOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.5)'; // Optional background for readability
+                        interactive.appendChild(codeOverlay);
+                    }
+
+                    self.disableControls(false); // Re-enable controls after initialization
+                });
+
+            } catch (error) {
+                console.error("Error starting scanner:", error);
+                self.handleError(error);
+                self.disableControls(false);
+            }
         },
         onProcessed: function (result) {
             var drawingCtx = Quagga.canvas.ctx.overlay,
