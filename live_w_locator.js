@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', function () {
             this.lastResult = null;
             this.scannerRunning = false;
             this.attachListeners();
-            this.initCameraSelection();
+            this.initCameraSelection(); // Initial device enumeration
         },
         handleError: function (err) {
             console.error(err);
@@ -61,45 +61,25 @@ document.addEventListener('DOMContentLoaded', function () {
         },
         initCameraSelection: function () {
             var self = this;
-        
-            // Request camera permissions and enumerate video devices
-            navigator.mediaDevices
-                .getUserMedia({ video: true })
-                .then(function () {
-                    return Quagga.CameraAccess.enumerateVideoDevices();
-                })
-                .then(function (devices) {
-                    var deviceSelection = document.getElementById("deviceSelection");
-                    var currentValue = deviceSelection.value; // Preserve current selection if exists
-                    while (deviceSelection.firstChild) {
-                        deviceSelection.removeChild(deviceSelection.firstChild); // Clear dropdown
+            Quagga.CameraAccess.enumerateVideoDevices().then(function (devices) {
+                var deviceSelection = document.getElementById("deviceSelection");
+                var currentValue = deviceSelection.value; // Get the current selected value
+                while (deviceSelection.firstChild) {
+                    deviceSelection.removeChild(deviceSelection.firstChild);
+                }
+                devices.forEach(function (device) {
+                    var option = document.createElement("option");
+                    option.value = device.deviceId || device.id;
+                    option.text = device.label || device.deviceId || device.id;
+                    if (option.value === currentValue) {
+                        option.selected = true; // Set the option as selected
                     }
-        
-                    // Populate dropdown with available devices
-                    devices.forEach(function (device, index) {
-                        var option = document.createElement("option");
-                        option.value = device.deviceId || device.id;
-                        option.text = device.label || `Camera ${index + 1}`;
-                        deviceSelection.appendChild(option);
-                    });
-        
-                    // Set the first device as default if none is selected
-                    if (!deviceSelection.value && devices.length > 0) {
-                        deviceSelection.value = devices[0].deviceId || devices[0].id;
-                    }
-        
-                    // Update the state to reflect the selected camera
-                    self.setState("inputStream.constraints.deviceId", deviceSelection.value);
-                })
-                .catch(function (err) {
-                    console.error("Error enumerating video devices:", err);
-                    alert("Please allow camera access.");
+                    deviceSelection.appendChild(option);
                 });
+            }).catch(function (err) {
+                console.error("Error enumerating video devices:", err);
+            });
         },
-        
-        
-        
-        
         attachListeners: function () {
             var self = this;
 
@@ -272,57 +252,53 @@ document.addEventListener('DOMContentLoaded', function () {
         },
         startScanner: async function () {
             var self = this;
-        
-            // Synchronize the camera dropdown before starting
-            await self.initCameraSelection();
-        
-            // Your original Quagga initialization logic remains untouched
             Quagga.init(self.state, function (err) {
                 if (err) {
                     self.handleError(err);
                     return;
                 }
-        
                 Quagga.start();
                 self.scannerRunning = true;
-        
                 self.checkCapabilities();
                 Quagga.onProcessed(self.onProcessed.bind(self));
                 Quagga.onDetected(self.onDetected.bind(self));
-        
+
                 // Ensure the bounding box is present
-                var interactive = document.querySelector("#interactive");
-                var boundingBox = document.getElementById("boundingBox");
+                var interactive = document.querySelector('#interactive');
+                var boundingBox = document.getElementById('boundingBox');
                 if (!boundingBox) {
-                    boundingBox = document.createElement("div");
-                    boundingBox.id = "boundingBox";
+                    // If bounding box is missing, create and append it
+                    boundingBox = document.createElement('div');
+                    boundingBox.id = 'boundingBox';
                     interactive.appendChild(boundingBox);
                 }
-        
-                // Your existing overlay logic remains
-                var codeOverlay = document.getElementById("codeOverlay");
+
+                // Create the code overlay
+                var codeOverlay = document.getElementById('codeOverlay');
                 if (!codeOverlay) {
-                    codeOverlay = document.createElement("div");
-                    codeOverlay.id = "codeOverlay";
-                    codeOverlay.style.position = "absolute";
-                    codeOverlay.style.top = "35%";
-                    codeOverlay.style.left = "20%";
-                    codeOverlay.style.width = "60%";
-                    codeOverlay.style.height = "30%";
-                    codeOverlay.style.display = "flex";
-                    codeOverlay.style.alignItems = "center";
-                    codeOverlay.style.justifyContent = "center";
-                    codeOverlay.style.color = "#FFFFFF";
-                    codeOverlay.style.fontSize = "24px";
-                    codeOverlay.style.fontWeight = "bold";
-                    codeOverlay.style.textAlign = "center";
-                    codeOverlay.style.pointerEvents = "none";
-                    codeOverlay.style.backgroundColor = "rgba(0, 0, 0, 0.5)";
+                    codeOverlay = document.createElement('div');
+                    codeOverlay.id = 'codeOverlay';
+                    codeOverlay.style.position = 'absolute';
+                    codeOverlay.style.top = '35%'; // Match the ROI top offset
+                    codeOverlay.style.left = '20%'; // Match the ROI left offset
+                    codeOverlay.style.width = '60%'; // Width between left and right offsets
+                    codeOverlay.style.height = '30%'; // Height between top and bottom offsets
+                    codeOverlay.style.display = 'flex';
+                    codeOverlay.style.alignItems = 'center';
+                    codeOverlay.style.justifyContent = 'center';
+                    codeOverlay.style.color = '#FFFFFF';
+                    codeOverlay.style.fontSize = '24px';
+                    codeOverlay.style.fontWeight = 'bold';
+                    codeOverlay.style.textAlign = 'center';
+                    codeOverlay.style.pointerEvents = 'none';
+                    codeOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.5)'; // Optional background for readability
                     interactive.appendChild(codeOverlay);
                 }
+
+                // **Add this line to refresh the device list after starting the scanner**
+                self.initCameraSelection();
             });
         },
-        
         onProcessed: function (result) {
             var drawingCtx = Quagga.canvas.ctx.overlay,
                 drawingCanvas = Quagga.canvas.dom.overlay;
