@@ -61,23 +61,38 @@ document.addEventListener('DOMContentLoaded', function () {
         },
         initCameraSelection: function () {
             var self = this;
-            Quagga.CameraAccess.enumerateVideoDevices().then(function (devices) {
-                var deviceSelection = document.getElementById("deviceSelection");
-                var currentValue = deviceSelection.value; // Get the current selected value
-                while (deviceSelection.firstChild) {
-                    deviceSelection.removeChild(deviceSelection.firstChild);
-                }
-                devices.forEach(function (device) {
-                    var option = document.createElement("option");
-                    option.value = device.deviceId || device.id;
-                    option.text = device.label || device.deviceId || device.id;
-                    if (option.value === currentValue) {
-                        option.selected = true; // Set the option as selected
+            Quagga.CameraAccess.enumerateVideoDevices()
+                .then(function (devices) {
+                    var deviceSelection = document.getElementById("deviceSelection");
+                    var currentValue = deviceSelection.value; // Store the current selected value
+                    while (deviceSelection.firstChild) {
+                        deviceSelection.removeChild(deviceSelection.firstChild); // Clear dropdown options
                     }
-                    deviceSelection.appendChild(option);
+        
+                    devices.forEach(function (device, index) {
+                        var option = document.createElement("option");
+                        option.value = device.deviceId || device.id;
+                        option.text = device.label || `Camera ${index + 1}`; // Use a fallback label if none exists
+                        if (option.value === currentValue) {
+                            option.selected = true; // Retain current selection
+                        }
+                        deviceSelection.appendChild(option);
+                    });
+        
+                    // Select the first camera by default if none is selected
+                    if (!deviceSelection.value && devices.length > 0) {
+                        deviceSelection.value = devices[0].deviceId || devices[0].id;
+                    }
+        
+                    // Ensure deviceId in state matches the selected device
+                    self.setState("inputStream.constraints.deviceId", deviceSelection.value);
+                })
+                .catch(function (err) {
+                    console.error("Error enumerating video devices:", err);
+                    alert("Could not enumerate video devices. Please check camera permissions.");
                 });
-            });
         },
+        
         attachListeners: function () {
             var self = this;
 
