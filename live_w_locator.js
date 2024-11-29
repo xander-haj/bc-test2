@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', function () {
         init: function () {
             this.lastResult = null;
             this.scannerRunning = false;
-            this.selectedDeviceId = null; // Add a property to keep track of the selected deviceId
+            this.selectedDeviceId = null; // Property to keep track of the selected deviceId
             this.attachListeners();
             // Do not initialize camera selection on load to avoid permissions issues
         },
@@ -287,6 +287,12 @@ document.addEventListener('DOMContentLoaded', function () {
             self.disableControls(true); // Disable controls while initializing
 
             try {
+                // First, enumerate and initialize camera selection
+                await self.initCameraSelection(self.selectedDeviceId);
+
+                // Update the state with the selected deviceId
+                self.state.inputStream.constraints.deviceId = self.selectedDeviceId;
+
                 // Initialize and start QuaggaJS
                 Quagga.init(self.state, function (err) {
                     if (err) {
@@ -319,12 +325,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         interactive.appendChild(codeOverlay);
                     }
 
-                    // After Quagga has started and camera permissions are granted, enumerate devices
-                    self.initCameraSelection(self.selectedDeviceId).then(function () { // Pass the selectedDeviceId
-                        self.disableControls(false); // Re-enable controls after initialization
-                    }).catch(function () {
-                        self.disableControls(false); // Even if enumeration fails, re-enable controls
-                    });
+                    self.disableControls(false); // Re-enable controls after initialization
                 });
 
             } catch (error) {
