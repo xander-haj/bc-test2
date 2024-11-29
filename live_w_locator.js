@@ -323,6 +323,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 // Initialize and start QuaggaJS
                 Quagga.init(self.state, function (err) {
                     if (err) {
+                        if (err.name === 'OverconstrainedError') {
+                            alert("The selected resolution is not supported by your camera. Please choose a different resolution.");
+                            self.handleError(err);
+                            self.disableControls(false);
+                            return;
+                        }
                         self.handleError(err);
                         self.disableControls(false);
                         return;
@@ -507,10 +513,10 @@ document.addEventListener('DOMContentLoaded', function () {
             inputStream: {
                 type: "LiveStream",
                 constraints: {
-                    width: { min: 640 },
-                    height: { min: 480 },
+                    width: { ideal: 640 }, // Changed from min to ideal
+                    height: { ideal: 480 }, // Changed from min to ideal
                     facingMode: "environment",
-                    aspectRatio: { min: 1, max: 2 },
+                    aspectRatio: { ideal: 1.333 }, // 4:3 aspect ratio for 640x480
                     deviceId: null, // Will be set dynamically
                 },
                 area: { // defines rectangle of the detection/localization area
