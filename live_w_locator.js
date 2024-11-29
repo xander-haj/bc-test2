@@ -61,37 +61,44 @@ document.addEventListener('DOMContentLoaded', function () {
         },
         initCameraSelection: function () {
             var self = this;
-            Quagga.CameraAccess.enumerateVideoDevices()
+        
+            // Request camera permissions before enumerating devices
+            navigator.mediaDevices
+                .getUserMedia({ video: true })
+                .then(function () {
+                    return Quagga.CameraAccess.enumerateVideoDevices();
+                })
                 .then(function (devices) {
                     var deviceSelection = document.getElementById("deviceSelection");
-                    var currentValue = deviceSelection.value; // Store the current selected value
+                    var currentValue = deviceSelection.value; // Preserve current selection if it exists
                     while (deviceSelection.firstChild) {
-                        deviceSelection.removeChild(deviceSelection.firstChild); // Clear dropdown options
+                        deviceSelection.removeChild(deviceSelection.firstChild); // Clear old options
                     }
         
-                    devices.forEach(function (device, index) {
+                    devices.forEach(function (device) {
                         var option = document.createElement("option");
                         option.value = device.deviceId || device.id;
-                        option.text = device.label || `Camera ${index + 1}`; // Use a fallback label if none exists
+                        option.text = device.label || "Unknown Camera"; // Handle undefined labels
                         if (option.value === currentValue) {
-                            option.selected = true; // Retain current selection
+                            option.selected = true; // Retain previous selection
                         }
                         deviceSelection.appendChild(option);
                     });
         
-                    // Select the first camera by default if none is selected
+                    // If no device is selected, set the first one as default
                     if (!deviceSelection.value && devices.length > 0) {
                         deviceSelection.value = devices[0].deviceId || devices[0].id;
                     }
         
-                    // Ensure deviceId in state matches the selected device
+                    // Update state with selected deviceId
                     self.setState("inputStream.constraints.deviceId", deviceSelection.value);
                 })
                 .catch(function (err) {
-                    console.error("Error enumerating video devices:", err);
-                    alert("Could not enumerate video devices. Please check camera permissions.");
+                    console.error("Error initializing camera selection:", err);
+                    alert("Could not access the camera. Please allow permissions.");
                 });
         },
+        
         
         attachListeners: function () {
             var self = this;
