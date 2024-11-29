@@ -68,9 +68,10 @@ document.addEventListener('DOMContentLoaded', function () {
          * Initialize Camera Selection with Optional Selected Device ID
          * @param {string} selectedDeviceId - The deviceId to be selected in the dropdown
          */
-        initCameraSelection: function (selectedDeviceId) {
+        initCameraSelection: async function (selectedDeviceId) {
             var self = this;
-            return Quagga.CameraAccess.enumerateVideoDevices().then(function (devices) {
+            try {
+                const devices = await Quagga.CameraAccess.enumerateVideoDevices();
                 var deviceSelection = document.getElementById("deviceSelection");
                 // Clear existing options
                 while (deviceSelection.firstChild) {
@@ -98,11 +99,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 // If no device is selected yet, set to the first device
                 if (!self.selectedDeviceId && devices.length > 0) {
                     self.selectedDeviceId = devices[0].deviceId || devices[0].id;
+                    deviceSelection.value = self.selectedDeviceId; // Ensure dropdown reflects the selection
                 }
-            }).catch(function (err) {
+            } catch (err) {
                 console.error("Error enumerating video devices:", err);
                 alert("Error accessing camera devices. Please ensure you have granted camera permissions.");
-            });
+            }
         },
         attachListeners: function () {
             var self = this;
@@ -132,7 +134,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (name === "inputStream_constraints_deviceId") {
                         // Handle camera device selection
                         self.selectedDeviceId = value; // Update the selectedDeviceId
-                        self.setState("inputStream.constraints.deviceId", value);
+                        self.setState("inputStream.constraints.deviceId", { exact: value }); // Use exact match
                     } else if (name.startsWith("settings_")) {
                         // Handle settings like zoom and torch
                         var setting = name.substring(9); // Remove 'settings_' prefix
@@ -291,7 +293,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 await self.initCameraSelection(self.selectedDeviceId);
 
                 // Update the state with the selected deviceId
-                self.state.inputStream.constraints.deviceId = self.selectedDeviceId;
+                self.state.inputStream.constraints.deviceId = { exact: self.selectedDeviceId };
 
                 // Initialize and start QuaggaJS
                 Quagga.init(self.state, function (err) {
