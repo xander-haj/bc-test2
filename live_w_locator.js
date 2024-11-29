@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', function () {
+    // Initialize Result Collector
     var resultCollector = Quagga.ResultCollector.create({
         capture: true,
         capacity: 20,
@@ -8,13 +9,16 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    // Register Result Collector with Quagga
+    Quagga.registerResultCollector(resultCollector);
+
     var App = {
         init: function () {
             this.lastResult = null;
             this.scannerRunning = false;
             this.attachListeners();
-            // Removed initial device enumeration to prevent incomplete list
-            // this.initCameraSelection();
+            // Initialize camera selection on load
+            this.initCameraSelection();
         },
         handleError: function (err) {
             console.error(err);
@@ -72,6 +76,14 @@ document.addEventListener('DOMContentLoaded', function () {
                 while (deviceSelection.firstChild) {
                     deviceSelection.removeChild(deviceSelection.firstChild);
                 }
+                if (devices.length === 0) {
+                    var option = document.createElement("option");
+                    option.value = "";
+                    option.text = "No camera devices found";
+                    deviceSelection.appendChild(option);
+                    deviceSelection.disabled = true;
+                    return;
+                }
                 devices.forEach(function (device) {
                     var option = document.createElement("option");
                     option.value = device.deviceId || device.id;
@@ -81,8 +93,10 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                     deviceSelection.appendChild(option);
                 });
+                deviceSelection.disabled = false;
             }).catch(function (err) {
                 console.error("Error enumerating video devices:", err);
+                alert("Error accessing camera devices. Please ensure you have granted camera permissions.");
             });
         },
         attachListeners: function () {
@@ -243,8 +257,6 @@ document.addEventListener('DOMContentLoaded', function () {
                         interactive.removeChild(canvas);
                     });
 
-                    // Do not remove other child nodes (like #boundingBox)
-
                     // Clear any overlays or results
                     var drawingCanvas = Quagga.canvas && Quagga.canvas.dom && Quagga.canvas.dom.overlay;
                     if (drawingCanvas) {
@@ -252,7 +264,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         drawingCtx.clearRect(0, 0, drawingCanvas.getAttribute("width"), drawingCanvas.getAttribute("height"));
                     }
 
-                    self._printCollectedResults(); // If you want to display collected results
+                    self._printCollectedResults(); // Display collected results
 
                 } catch (error) {
                     console.error("Error releasing camera:", error);
@@ -313,25 +325,12 @@ document.addEventListener('DOMContentLoaded', function () {
                         interactive.appendChild(boundingBox);
                     }
 
-                    // Create the code overlay
+                    // Ensure the code overlay is present
                     var codeOverlay = document.getElementById('codeOverlay');
                     if (!codeOverlay) {
                         codeOverlay = document.createElement('div');
                         codeOverlay.id = 'codeOverlay';
-                        codeOverlay.style.position = 'absolute';
-                        codeOverlay.style.top = '35%'; // Match the ROI top offset
-                        codeOverlay.style.left = '20%'; // Match the ROI left offset
-                        codeOverlay.style.width = '60%'; // Width between left and right offsets
-                        codeOverlay.style.height = '30%'; // Height between top and bottom offsets
-                        codeOverlay.style.display = 'flex';
-                        codeOverlay.style.alignItems = 'center';
-                        codeOverlay.style.justifyContent = 'center';
-                        codeOverlay.style.color = '#FFFFFF';
-                        codeOverlay.style.fontSize = '24px';
-                        codeOverlay.style.fontWeight = 'bold';
-                        codeOverlay.style.textAlign = 'center';
-                        codeOverlay.style.pointerEvents = 'none';
-                        codeOverlay.style.backgroundColor = 'rgba(0, 0, 0, 0.5)'; // Optional background for readability
+                        // Styling is handled in CSS
                         interactive.appendChild(codeOverlay);
                     }
 
@@ -415,6 +414,9 @@ document.addEventListener('DOMContentLoaded', function () {
                     "</h4></div></div>";
                 document.querySelector("#result_strip ul.thumbnails").prepend(node);
             }
+
+            // Push the result to the resultCollector
+            resultCollector.collect(result);
         },
         _printCollectedResults: function () {
             var results = resultCollector.getResults(),
