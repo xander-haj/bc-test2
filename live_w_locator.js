@@ -152,13 +152,17 @@ document.addEventListener('DOMContentLoaded', function () {
                             self.selectedDeviceId = value; // Update the selectedDeviceId
                             self.setState("inputStream.constraints.deviceId", { exact: value });
                         }
+                    } else if (name === "inputStream_constraints_resolution") {
+                        // Handle resolution selection
+                        if (value) {
+                            var [width, height] = value.split('x').map(Number);
+                            self.setState("inputStream.constraints.width", { exact: width });
+                            self.setState("inputStream.constraints.height", { exact: height });
+                        }
                     } else if (name.startsWith("settings_")) {
                         // Handle settings like zoom and torch
                         var setting = name.substring(9); // Remove 'settings_' prefix
                         self.applySetting(setting, value);
-                    } else if (name === "inputStream_constraints_width" || name === "inputStream_constraints_height") {
-                        // Handle resolution changes
-                        self.setState(name, value);
                     } else {
                         self.setState(state, value);
                     }
@@ -457,10 +461,10 @@ document.addEventListener('DOMContentLoaded', function () {
             inputStream: {
                 constraints: {
                     width: function (value) {
-                        return { min: parseInt(value) };
+                        return { exact: parseInt(value) };
                     },
                     height: function (value) {
-                        return { min: parseInt(value) };
+                        return { exact: parseInt(value) };
                     },
                     deviceId: function (value) {
                         return value;
