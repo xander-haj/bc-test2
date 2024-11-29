@@ -156,8 +156,8 @@ document.addEventListener('DOMContentLoaded', function () {
                         // Handle resolution selection
                         if (value) {
                             var [width, height] = value.split('x').map(Number);
-                            self.setState("inputStream.constraints.width", { exact: width });
-                            self.setState("inputStream.constraints.height", { exact: height });
+                            self.setState("inputStream.constraints.width", { ideal: width });
+                            self.setState("inputStream.constraints.height", { ideal: height });
                         }
                     } else if (name.startsWith("settings_")) {
                         // Handle settings like zoom and torch
@@ -461,10 +461,10 @@ document.addEventListener('DOMContentLoaded', function () {
             inputStream: {
                 constraints: {
                     width: function (value) {
-                        return { exact: parseInt(value) };
+                        return { ideal: parseInt(value) };
                     },
                     height: function (value) {
-                        return { exact: parseInt(value) };
+                        return { ideal: parseInt(value) };
                     },
                     deviceId: function (value) {
                         return value;
