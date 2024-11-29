@@ -13,7 +13,8 @@ document.addEventListener('DOMContentLoaded', function () {
             this.lastResult = null;
             this.scannerRunning = false;
             this.attachListeners();
-            this.initCameraSelection(); // Initial device enumeration
+            // Removed initial device enumeration to prevent incomplete list
+            // this.initCameraSelection();
         },
         handleError: function (err) {
             console.error(err);
@@ -59,20 +60,20 @@ document.addEventListener('DOMContentLoaded', function () {
                 return;
             }
         },
-        initCameraSelection: function () {
+        initCameraSelection: function (selectedDeviceId) { // Modified to accept selectedDeviceId
             var self = this;
-            Quagga.CameraAccess.enumerateVideoDevices().then(function (devices) {
+            return Quagga.CameraAccess.enumerateVideoDevices().then(function (devices) {
                 var deviceSelection = document.getElementById("deviceSelection");
-                var currentValue = deviceSelection.value; // Get the current selected value
+                // Clear existing options
                 while (deviceSelection.firstChild) {
                     deviceSelection.removeChild(deviceSelection.firstChild);
                 }
                 devices.forEach(function (device) {
                     var option = document.createElement("option");
                     option.value = device.deviceId || device.id;
-                    option.text = device.label || device.deviceId || device.id;
-                    if (option.value === currentValue) {
-                        option.selected = true; // Set the option as selected
+                    option.text = device.label || `Camera ${device.deviceId || device.id}`;
+                    if (device.deviceId === selectedDeviceId) { // Set selected device
+                        option.selected = true;
                     }
                     deviceSelection.appendChild(option);
                 });
@@ -295,8 +296,17 @@ document.addEventListener('DOMContentLoaded', function () {
                     interactive.appendChild(codeOverlay);
                 }
 
-                // **Add this line to refresh the device list after starting the scanner**
-                self.initCameraSelection();
+                // **New Code: Enumerate devices and set the dropdown to the active device**
+                var activeTrack = Quagga.CameraAccess.getActiveTrack();
+                if (activeTrack) {
+                    var deviceId = activeTrack.getSettings().deviceId;
+                    self.initCameraSelection(deviceId).then(function () {
+                        // Dropdown is now updated with the correct device selected
+                    });
+                } else {
+                    // Fallback: Enumerate without selecting any device
+                    self.initCameraSelection();
+                }
             });
         },
         onProcessed: function (result) {
@@ -446,7 +456,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     height: { min: 480 },
                     facingMode: "environment",
                     aspectRatio: { min: 1, max: 2 },
-                    deviceId: null, // Ensure deviceId is included
+                    deviceId: null, // Will be set dynamically
                 },
                 area: { // defines rectangle of the detection/localization area
                     top: "35%",    // top offset
