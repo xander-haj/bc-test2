@@ -105,6 +105,13 @@
       margin-bottom: 5px;
     }
 
+    /* Adjusting the layout for buttons */
+    .controls .input-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
     .controls select,
     .controls input[type="checkbox"],
     .controls button {
@@ -174,27 +181,16 @@
             </select>
           </label>
 
-          <!-- Updated Resolution Inputs -->
+          <!-- Combined Resolution Inputs -->
           <label>
-            <span>Resolution Width (px)</span>
-            <select name="inputStream_constraints_width">
-              <option value="320">320px</option>
-              <option selected="selected" value="640">640px</option>
-              <option value="800">800px</option>
-              <option value="1280">1280px</option>
-              <option value="1600">1600px</option>
-              <option value="1920">1920px</option>
-            </select>
-          </label>
-          <label>
-            <span>Resolution Height (px)</span>
-            <select name="inputStream_constraints_height">
-              <option value="240">240px</option>
-              <option selected="selected" value="480">480px</option>
-              <option value="600">600px</option>
-              <option value="720">720px</option>
-              <option value="960">960px</option>
-              <option value="1080">1080px</option>
+            <span>Resolution</span>
+            <select name="inputStream_constraints_resolution">
+              <option value="320x240">320x240</option>
+              <option selected="selected" value="640x480">640x480</option>
+              <option value="800x600">800x600</option>
+              <option value="1280x720">1280x720</option>
+              <option value="1600x960">1600x960</option>
+              <option value="1920x1080">1920x1080</option>
             </select>
           </label>
 
