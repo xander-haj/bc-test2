@@ -66,7 +66,8 @@ document.addEventListener('DOMContentLoaded', function () {
         },
         /**
          * Initialize Camera Selection with Optional Selected Device ID
-         * @param {string} selectedDeviceId - The deviceId to be selected in the dropdown
+         * @param {string|null} selectedDeviceId - The deviceId to be selected in the dropdown
+         * @returns {Promise<string|null>} - The selectedDeviceId
          */
         initCameraSelection: async function (selectedDeviceId) {
             var self = this;
@@ -83,27 +84,41 @@ document.addEventListener('DOMContentLoaded', function () {
                     option.text = "No camera devices found";
                     deviceSelection.appendChild(option);
                     deviceSelection.disabled = true;
-                    return;
+                    return null;
                 }
-                devices.forEach(function (device) {
+
+                let hasValidDevice = false;
+                devices.forEach(function (device, index) {
+                    if (!device.deviceId || device.deviceId.trim() === "") {
+                        console.warn(`Device at index ${index} has no valid deviceId and will be skipped.`);
+                        return;
+                    }
                     var option = document.createElement("option");
-                    option.value = device.deviceId || device.id;
-                    option.text = device.label || `Camera ${device.deviceId || device.id}`;
+                    option.value = device.deviceId;
+                    option.text = device.label || `Camera ${index + 1}`;
                     if (device.deviceId === selectedDeviceId) { // Set selected device
                         option.selected = true;
+                        hasValidDevice = true;
                     }
                     deviceSelection.appendChild(option);
                 });
-                deviceSelection.disabled = false;
 
-                // If no device is selected yet, set to the first device
-                if (!self.selectedDeviceId && devices.length > 0) {
-                    self.selectedDeviceId = devices[0].deviceId || devices[0].id;
-                    deviceSelection.value = self.selectedDeviceId; // Ensure dropdown reflects the selection
+                if (!hasValidDevice) {
+                    // Set to first device
+                    const firstDevice = devices.find(device => device.deviceId && device.deviceId.trim() !== "");
+                    if (firstDevice) {
+                        self.selectedDeviceId = firstDevice.deviceId;
+                        deviceSelection.value = self.selectedDeviceId;
+                        console.log(`Selected deviceId set to: ${self.selectedDeviceId}`);
+                    }
                 }
+
+                deviceSelection.disabled = false;
+                return self.selectedDeviceId;
             } catch (err) {
                 console.error("Error enumerating video devices:", err);
                 alert("Error accessing camera devices. Please ensure you have granted camera permissions.");
+                return null;
             }
         },
         attachListeners: function () {
@@ -133,8 +148,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     if (name === "inputStream_constraints_deviceId") {
                         // Handle camera device selection
-                        self.selectedDeviceId = value; // Update the selectedDeviceId
-                        self.setState("inputStream.constraints.deviceId", { exact: value }); // Use exact match
+                        if (value) {
+                            self.selectedDeviceId = value; // Update the selectedDeviceId
+                            self.setState("inputStream.constraints.deviceId", { exact: value });
+                        }
                     } else if (name.startsWith("settings_")) {
                         // Handle settings like zoom and torch
                         var setting = name.substring(9); // Remove 'settings_' prefix
@@ -290,10 +307,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
             try {
                 // First, enumerate and initialize camera selection
-                await self.initCameraSelection(self.selectedDeviceId);
+                const selectedDeviceId = await self.initCameraSelection(self.selectedDeviceId);
+
+                if (!selectedDeviceId) {
+                    throw new Error("No camera device selected.");
+                }
 
                 // Update the state with the selected deviceId
-                self.state.inputStream.constraints.deviceId = { exact: self.selectedDeviceId };
+                self.state.inputStream.constraints.deviceId = { exact: selectedDeviceId };
 
                 // Initialize and start QuaggaJS
                 Quagga.init(self.state, function (err) {
