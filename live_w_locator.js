@@ -152,17 +152,13 @@ document.addEventListener('DOMContentLoaded', function () {
                             self.selectedDeviceId = value; // Update the selectedDeviceId
                             self.setState("inputStream.constraints.deviceId", { exact: value });
                         }
-                    } else if (name === "inputStream_constraints_resolution") {
-                        // Handle resolution selection
-                        if (value) {
-                            var [width, height] = value.split('x').map(Number);
-                            self.setState("inputStream.constraints.width", { ideal: width });
-                            self.setState("inputStream.constraints.height", { ideal: height });
-                        }
                     } else if (name.startsWith("settings_")) {
                         // Handle settings like zoom and torch
                         var setting = name.substring(9); // Remove 'settings_' prefix
                         self.applySetting(setting, value);
+                    } else if (name === "inputStream_constraints_width" || name === "inputStream_constraints_height") {
+                        // Handle resolution changes
+                        self.setState(name, value);
                     } else {
                         self.setState(state, value);
                     }
@@ -323,12 +319,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 // Initialize and start QuaggaJS
                 Quagga.init(self.state, function (err) {
                     if (err) {
-                        if (err.name === 'OverconstrainedError') {
-                            alert("The selected resolution is not supported by your camera. Please choose a different resolution.");
-                            self.handleError(err);
-                            self.disableControls(false);
-                            return;
-                        }
                         self.handleError(err);
                         self.disableControls(false);
                         return;
@@ -467,10 +457,10 @@ document.addEventListener('DOMContentLoaded', function () {
             inputStream: {
                 constraints: {
                     width: function (value) {
-                        return { ideal: parseInt(value) };
+                        return { min: parseInt(value) };
                     },
                     height: function (value) {
-                        return { ideal: parseInt(value) };
+                        return { min: parseInt(value) };
                     },
                     deviceId: function (value) {
                         return value;
@@ -513,10 +503,10 @@ document.addEventListener('DOMContentLoaded', function () {
             inputStream: {
                 type: "LiveStream",
                 constraints: {
-                    width: { ideal: 640 }, // Changed from min to ideal
-                    height: { ideal: 480 }, // Changed from min to ideal
+                    width: { min: 640 },
+                    height: { min: 480 },
                     facingMode: "environment",
-                    aspectRatio: { ideal: 1.333 }, // 4:3 aspect ratio for 640x480
+                    aspectRatio: { min: 1, max: 2 },
                     deviceId: null, // Will be set dynamically
                 },
                 area: { // defines rectangle of the detection/localization area

@@ -14,9 +14,6 @@
   <style>
     #interactive {
       position: relative;
-      width: 100%;
-      max-width: 800px;
-      margin: 0 auto; /* Center the interactive area */
     }
 
     #boundingBox {
@@ -95,27 +92,17 @@
 
     .controls {
       margin-bottom: 20px;
-      text-align: center; /* Center the controls */
     }
 
     .controls fieldset {
       border: 1px solid #ccc;
       padding: 10px;
       margin-bottom: 10px;
-      display: inline-block; /* Allow centering */
     }
 
     .controls label {
       display: block;
       margin-bottom: 5px;
-    }
-
-    /* Adjusting the layout for buttons */
-    .controls .input-group {
-      display: flex;
-      justify-content: center; /* Center the buttons */
-      gap: 20px; /* Increase spacing between buttons */
-      margin-bottom: 10px;
     }
 
     .controls select,
@@ -148,11 +135,6 @@
         max-width: 100px;
         max-height: 100px;
       }
-
-      .controls .input-group {
-        flex-direction: column;
-        gap: 10px;
-      }
     }
   </style>
 </head>
@@ -164,9 +146,9 @@
     </header>
 
     <section id="container" class="container">
-      <h3>The User's Camera</h3>
-      <p>If your platform supports the <strong>getUserMedia</strong> API call, you can try the real-time locating and decoding features. Simply allow the page to access your webcam and point it to a barcode.</p>
-      <p>The various options available allow you to adjust the decoding process to your needs (Type of barcode, resolution, etc.).</p>
+      <h3>The user's camera</h3>
+      <p>If your platform supports the <strong>getUserMedia</strong> API call, you can try the real-time locating and decoding features. Simply allow the page to access your web-cam and point it to a barcode.</p>
+      <p>The various options available allow you to adjust the decoding process to your needs (Type of barcode, resolution, ...).</p>
       <p><strong>Note:</strong> Please enable camera permissions when prompted to ensure the barcode scanner works correctly.</p>
       <div class="controls">
         <fieldset class="input-group">
@@ -192,16 +174,27 @@
             </select>
           </label>
 
-          <!-- Combined Resolution Inputs -->
+          <!-- Updated Resolution Inputs -->
           <label>
-            <span>Resolution</span>
-            <select name="inputStream_constraints_resolution">
-              <option value="320x240">320x240</option>
-              <option selected="selected" value="640x480">640x480</option>
-              <option value="800x600">800x600</option>
-              <option value="1280x720">1280x720</option>
-              <option value="1600x960">1600x960</option>
-              <option value="1920x1080">1920x1080</option>
+            <span>Resolution Width (px)</span>
+            <select name="inputStream_constraints_width">
+              <option value="320">320px</option>
+              <option selected="selected" value="640">640px</option>
+              <option value="800">800px</option>
+              <option value="1280">1280px</option>
+              <option value="1600">1600px</option>
+              <option value="1920">1920px</option>
+            </select>
+          </label>
+          <label>
+            <span>Resolution Height (px)</span>
+            <select name="inputStream_constraints_height">
+              <option value="240">240px</option>
+              <option selected="selected" value="480">480px</option>
+              <option value="600">600px</option>
+              <option value="720">720px</option>
+              <option value="960">960px</option>
+              <option value="1080">1080px</option>
             </select>
           </label>
 
